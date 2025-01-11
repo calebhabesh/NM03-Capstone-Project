@@ -1,0 +1,37 @@
+# Build directory
+build/
+out/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+!CMakeLists.txt
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Debug files
+*.pdb
+*.ilk
+
+# Dataset files (assuming you'll have a separate data directory)
+data/
+dataset/
+BRATS/
+
+# System files
+.DS_Store
+Thumbs.db
+
