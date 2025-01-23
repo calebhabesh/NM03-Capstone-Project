@@ -5,6 +5,8 @@ out/
 # CMake files
 CMakeCache.txt
 CMakeFiles/
+cmake-build-debug/
+.cache/
 *.cmake
 !CMakeLists.txt
 
