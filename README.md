@@ -1,4 +1,4 @@
-# Brain Tumor Detection using the FAST Framework
+# Brain Imaging Segmentation using the FAST Framework
 
 A parallel computing system for medical diagnoses with image matching using the [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization) framework. This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging tasks involving brain tumor detection.
 
@@ -23,21 +23,18 @@ cmake --build . --config Release
 ```
 .
 ├── src/            # Source files
-├── include/        # Header files
-├── test/           # Test files
 ├── CMakeLists.txt  # CMake configuration
 └── README.md       # This file
 ```
 
-## License 
+## License
 
-This project uses the FAST framework for medical image computing and visualization. 
+This project uses the FAST framework for medical image computing and visualization.
 
 ### FAST Licensing
+
 - The source code of FAST is licensed under the BSD 2-clause license.
-- FAST binaries are linked with third-party libraries licensed under various open-source licenses, including MIT, Apache 2.0, LGPL, and others. 
+- FAST binaries are linked with third-party libraries licensed under various open-source licenses, including MIT, Apache 2.0, LGPL, and others.
 - For more information, see the `licenses` folder in the FAST release or refer to their [license documentation](https://github.com/smistad/FAST/blob/master/LICENSE).
 
 Please ensure compliance with all applicable licenses when distributing or modifying this project.
-
-
