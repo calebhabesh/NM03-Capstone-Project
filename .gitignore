@@ -28,6 +28,13 @@ cmake-build-debug/
 *.pdb
 *.ilk
 
+# Vim Session files
+Session.vim
+*.vim~ 
+*.swp
+*.swo
+*.vimses
+
 # Dataset files (assuming you'll have a separate data directory)
 data/
 dataset/
