@@ -1,7 +1,8 @@
 # Build directory
 build/
-out/
 out-test/
+out-sequential/
+out-parallel/
 
 # CMake files
 CMakeCache.txt
