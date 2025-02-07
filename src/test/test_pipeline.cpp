@@ -1,4 +1,5 @@
 // Add the mountain of modules
+#include "FAST/Data/DataTypes.hpp"
 #include "FAST/includes.hpp"
 
 #include <sys/types.h>
@@ -65,55 +66,50 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Create color mapping for segmentation
-  LabelColors labelColors;
-  labelColors[1] = Color::Black(); // Map label 1 to black color
-
   // =============================================================
 
-  // == Post-Processing and Analysis Stage ==
-  // 1. Morphological operations to clean up segmentation
-  auto erosion = Erosion::create(3); // Remove small artifacts
-  erosion->connect(regionGrowing);
+  // == Post-Processing Stage ==
+  // Cast to uint8 for morphology operations
+  auto caster = ImageCaster::create(TYPE_UINT8);
+  caster->connect(regionGrowing);
 
-  auto dilation =
-      Dilation::create(3); // Restore size while keeping cleaned edges
-  dilation->connect(erosion);
+  // Morphological operations to clean up segmentation
+  auto erosion = Erosion::create(3);
+  erosion->connect(caster);
 
-  // 2. Calculate region properties
-  auto regionProps = RegionProperties::create();
-  regionProps->connect(dilation);
+  auto dilation = Dilation::create(3);
+  dilation->connect(caster);
 
   // =============================================================
 
   // == Visualization Stage ==
-  // Renders for original,prefilter,segmentation
-  auto segmentationRenderer =
-      SegmentationRenderer::create(
-          labelColors, // Now passing the std::map directly
-          0.6f,        // Segmentation opacity
-          1.0f,        // Border opacity
-          2            // Border radius
-          )
-          ->connect(regionGrowing);
+  LabelColors labelColors;
+  labelColors[1] = Color::Black();
 
   auto original = ImageRenderer::create()->connect(importer);
   auto prefilter = ImageRenderer::create()->connect(sharpen);
 
-  // Create a dual view window, add the renderers and start the
-  // computation/rendering loop.
-  auto multiWindow =
-      MultiViewWindow::create(3, Color::White(), 1300, 450, false);
+  auto segmentationRenderer =
+      SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+          ->connect(regionGrowing); // Connect to dilation output
 
-  // Add renderers
+  auto dilation_render =
+      SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+          ->connect(dilation); // Connect to dilation output
+
+  auto erosion_render = SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+                            ->connect(erosion); // Connect to dilation output
+
+  auto multiWindow =
+      MultiViewWindow::create(5, Color::White(), 2300, 450, false);
+
   multiWindow->addRenderer(0, original);
   multiWindow->addRenderer(1, prefilter);
   multiWindow->addRenderer(2, segmentationRenderer);
+  multiWindow->addRenderer(3, dilation_render);
+  multiWindow->addRenderer(4, erosion_render);
 
-  // Set window title
   multiWindow->setTitle("Medical Image Processing Stages");
-
-  // Start the window
   multiWindow->run();
   return 0;
 }
