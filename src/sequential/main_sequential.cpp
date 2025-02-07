@@ -36,7 +36,20 @@ private:
     }
     return 1000;
   }
-
+  void setupOutputDirectory() {
+    try {
+      // Remove and recreate directory in one command, similar to test code
+      if (system(("rm -rf " + outputPath + " && mkdir -p " + outputPath)
+                     .c_str()) != 0) {
+        throw std::runtime_error("Failed to setup output directory: " +
+                                 outputPath);
+      }
+      std::cout << "Created clean output directory: " + outputPath << std::endl;
+    } catch (const std::exception &e) {
+      throw std::runtime_error("Error setting up output directory: " +
+                               std::string(e.what()));
+    }
+  }
   void verifyProcessingStep(std::shared_ptr<ProcessObject> process,
                             const std::string &stepName) {
     try {
@@ -84,15 +97,15 @@ private:
   }
 
 public:
+public:
   SequentialImageProcessor(const std::string &outputDir = "../out-sequential")
       : outputPath(outputDir) {
     basePath = Config::getTestDataPath() +
                "Brain-Tumor-Progression/PGBM-017/09-17-1997-RA FH MR RCBV "
                "OP-85753/16.000000-T1post-19554/";
-    loadDICOMFiles();
 
-    // Create output directory
-    system(("mkdir -p " + outputPath).c_str());
+    setupOutputDirectory();
+    loadDICOMFiles();
   }
 
   void loadDICOMFiles() {
