@@ -5,7 +5,9 @@
 
 // Visualization includes
 #include <FAST/Visualization/MultiViewWindow.hpp>
+#include <FAST/Visualization/RenderToImage/RenderToImage.hpp>
 #include <FAST/Visualization/SegmentationRenderer/SegmentationRenderer.hpp>
+#include <FAST/Visualization/SimpleWindow.hpp>
 
 // Algorithm includes
 #include <FAST/Algorithms/BinaryThresholding/BinaryThresholding.hpp>
@@ -22,8 +24,11 @@
 #include <FAST/Algorithms/RegionProperties/RegionProperties.hpp>
 
 // I/O includes
+#include <FAST/Exporters/ImageExporter.hpp>
+#include <FAST/Exporters/ImageFileExporter.hpp>
 #include <FAST/Exporters/MetaImageExporter.hpp>
 #include <FAST/Importers/DICOMFileImporter.hpp>
+#include <FAST/Importers/ImageFileImporter.hpp>
 
 // System includes
 #include <sys/types.h>

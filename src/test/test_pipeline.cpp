@@ -1,10 +1,32 @@
-// Add the mountain of modules
-#include "FAST/Data/DataTypes.hpp"
+// Add modules from includes.hpp
+#include "FAST/Visualization/RenderToImage/RenderToImage.hpp"
 #include "FAST/includes.hpp"
 
 #include <sys/types.h>
 
 using namespace fast;
+
+// == Export Stage ==
+void exportImages(
+    const std::string &outputPath, std::shared_ptr<RenderToImage> renderToImage,
+    const std::vector<std::pair<std::string, std::shared_ptr<Renderer>>>
+        &renderPairs) {
+
+  // Create output directory
+  system(("rm -rf " + outputPath + " && mkdir -p " + outputPath).c_str());
+
+  // Export each image
+  for (const auto &[filename, renderer] : renderPairs) {
+    renderToImage->removeAllRenderers();
+    renderToImage->connect(renderer);
+    renderToImage->update();
+
+    auto exporter =
+        ImageFileExporter::create(outputPath + "/" + filename + ".jpg");
+    exporter->connect(renderToImage->getOutputData<Image>(0));
+    exporter->update();
+  }
+}
 
 int main(int argc, char **argv) {
   // Define the DICOM File Importer and point to T1C Brain Tumor Dataset .dcm
@@ -93,12 +115,13 @@ int main(int argc, char **argv) {
       SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
           ->connect(regionGrowing); // Connect to dilation output
 
+  auto erosion_render = SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+                            ->connect(erosion); // Connect to dilation output
+
+  // This will be the final segegmented result that will get exported into /out
   auto dilation_render =
       SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
           ->connect(dilation); // Connect to dilation output
-
-  auto erosion_render = SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
-                            ->connect(erosion); // Connect to dilation output
 
   auto multiWindow =
       MultiViewWindow::create(5, Color::White(), 2300, 450, false);
@@ -106,10 +129,34 @@ int main(int argc, char **argv) {
   multiWindow->addRenderer(0, original);
   multiWindow->addRenderer(1, prefilter);
   multiWindow->addRenderer(2, segmentationRenderer);
-  multiWindow->addRenderer(3, dilation_render);
-  multiWindow->addRenderer(4, erosion_render);
+  multiWindow->addRenderer(3, erosion_render);
+  multiWindow->addRenderer(4, dilation_render);
 
   multiWindow->setTitle("Medical Image Processing Stages");
   multiWindow->run();
+
+  // =============================================================
+
+  // == Export Stage ==
+  // create output directory, create if it does not exist
+  auto renderToImage = RenderToImage::create(Color::White(), 512, 512);
+
+  // Define export configurations
+  std::vector<std::pair<std::string, std::shared_ptr<Renderer>>> renderPairs = {
+      {"original_image", ImageRenderer::create()->connect(importer)},
+      {"preprocessed_image", ImageRenderer::create()->connect(sharpen)},
+      {"segmentation", SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+                           ->connect(regionGrowing)},
+      {"erosion_result",
+       SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+           ->connect(erosion)},
+      {"final_dilated_result",
+       SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+           ->connect(dilation)}};
+
+  exportImages("../out", renderToImage, renderPairs);
+
+  return 0;
+
   return 0;
 }
