@@ -73,8 +73,8 @@ private:
       renderToImage->removeAllRenderers();
       renderToImage->connect(dilationRenderer);
       renderToImage->update();
-      exporter =
-          ImageFileExporter::create(outputPath + "/" + baseName + "_final.jpg");
+      exporter = ImageFileExporter::create(outputPath + "/" + baseName +
+                                           "_processed.jpg");
       exporter->connect(renderToImage->getOutputData<Image>(0));
       exporter->update();
     } catch (Exception &e) {
@@ -84,7 +84,7 @@ private:
   }
 
 public:
-  SequentialImageProcessor(const std::string &outputDir = "../out")
+  SequentialImageProcessor(const std::string &outputDir = "../out-sequential")
       : outputPath(outputDir) {
     basePath = Config::getTestDataPath() +
                "Brain-Tumor-Progression/PGBM-017/09-17-1997-RA FH MR RCBV "
