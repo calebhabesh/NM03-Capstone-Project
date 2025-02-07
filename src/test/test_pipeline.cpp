@@ -6,7 +6,7 @@
 
 using namespace fast;
 
-// == Export Stage ==
+// == Export Stage Helper Function ==
 void exportImages(
     const std::string &outputPath, std::shared_ptr<RenderToImage> renderToImage,
     const std::vector<std::pair<std::string, std::shared_ptr<Renderer>>>
@@ -31,6 +31,7 @@ void exportImages(
 int main(int argc, char **argv) {
   // Define the DICOM File Importer and point to T1C Brain Tumor Dataset .dcm
   // file for testing
+  // 1. == Input/Import Stage ==
   auto importer = DICOMFileImporter::create(
       Config::getTestDataPath() +
       "Brain-Tumor-Progression/PGBM-017/09-17-1997-RA FH MR RCBV "
@@ -41,7 +42,7 @@ int main(int argc, char **argv) {
   // Otherwise will cause issues where filter interprets DICOM as 3D volume
   importer->setLoadSeries(false);
 
-  // == Image Preprocessing Stage ==
+  // 2. == Image Preprocessing Stage ==
 
   // 1. Intensity Normalization
   auto normalize = IntensityNormalization::create(0.5f, 2.5f, 0.0f, 10000.0f);
@@ -58,7 +59,7 @@ int main(int argc, char **argv) {
 
   // =============================================================
 
-  // == Segmentation Stage ==
+  // 3. == Segmentation Stage ==
   // SeededRegionGrowing Segmentation
   // Create seeded region growing w/ similar intenisty range as thresholding
   auto regionGrowing = SeededRegionGrowing::create(
@@ -90,7 +91,7 @@ int main(int argc, char **argv) {
 
   // =============================================================
 
-  // == Post-Processing Stage ==
+  // 4. == Post-Processing Stage ==
   // Cast to uint8 for morphology operations
   auto caster = ImageCaster::create(TYPE_UINT8);
   caster->connect(regionGrowing);
@@ -104,7 +105,7 @@ int main(int argc, char **argv) {
 
   // =============================================================
 
-  // == Visualization Stage ==
+  // 5. == Visualization Stage ==
   LabelColors labelColors;
   labelColors[1] = Color::Black();
 
@@ -137,7 +138,7 @@ int main(int argc, char **argv) {
 
   // =============================================================
 
-  // == Export Stage ==
+  // 6. == Export Stage ==
   // create output directory, create if it does not exist
   auto renderToImage = RenderToImage::create(Color::White(), 512, 512);
 
