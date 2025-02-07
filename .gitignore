@@ -1,6 +1,7 @@
 # Build directory
 build/
 out/
+out-test/
 
 # CMake files
 CMakeCache.txt
