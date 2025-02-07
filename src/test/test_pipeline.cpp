@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
        SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
            ->connect(dilation)}};
 
-  exportImages("../out", renderToImage, renderPairs);
+  exportImages("../out-test", renderToImage, renderPairs);
 
   return 0;
 
