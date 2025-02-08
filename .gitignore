@@ -37,7 +37,7 @@ Session.vim
 *.swo
 *.vimses
 
-# Dataset files (assuming you'll have a separate data directory)
+# Dataset files 
 data/
 dataset/
 BRATS/
