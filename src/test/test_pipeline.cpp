@@ -158,6 +158,4 @@ int main(int argc, char **argv) {
   exportImages("../out-test", renderToImage, renderPairs);
 
   return 0;
-
-  return 0;
 }
