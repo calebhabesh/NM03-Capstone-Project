@@ -220,9 +220,9 @@ public:
       auto startExport = std::chrono::high_resolution_clock::now();
 
       LabelColors labelColors;
-      labelColors[1] = Color::Black();
+      labelColors[1] = Color::White();
 
-      auto renderToImage = RenderToImage::create(Color::White(), 512, 512);
+      auto renderToImage = RenderToImage::create(Color::Black(), 512, 512);
       auto originalRenderer = ImageRenderer::create()->connect(importer);
       auto dilationRenderer =
           SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)

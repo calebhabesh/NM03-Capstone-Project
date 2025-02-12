@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
 
   // 5. == Visualization Stage ==
   LabelColors labelColors;
-  labelColors[1] = Color::Black();
+  labelColors[1] = Color::White();
 
   auto original = ImageRenderer::create()->connect(importer);
   auto prefilter = ImageRenderer::create()->connect(sharpen);
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
           ->connect(dilation); // Connect to dilation output
 
   auto multiWindow =
-      MultiViewWindow::create(5, Color::White(), 2300, 450, false);
+      MultiViewWindow::create(5, Color::Black(), 2300, 450, false);
 
   multiWindow->addRenderer(0, original);
   multiWindow->addRenderer(1, prefilter);
