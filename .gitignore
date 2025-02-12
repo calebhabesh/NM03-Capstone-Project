@@ -1,6 +1,8 @@
 # Build directory
 build/
-out/
+out-test/
+out-sequential/
+out-parallel/
 
 # CMake files
 CMakeCache.txt
@@ -28,7 +30,14 @@ cmake-build-debug/
 *.pdb
 *.ilk
 
-# Dataset files (assuming you'll have a separate data directory)
+# Vim Session files
+Session.vim
+*.vim~ 
+*.swp
+*.swo
+*.vimses
+
+# Dataset files 
 data/
 dataset/
 BRATS/
