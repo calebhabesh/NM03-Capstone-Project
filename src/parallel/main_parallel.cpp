@@ -10,7 +10,7 @@
 using namespace fast;
 namespace fs = std::filesystem;
 
-class SequentialImageProcessor {
+class ParallelImageProcessor {
 private:
   std::vector<std::string> dicomFiles;
   std::string basePath;
@@ -109,7 +109,7 @@ private:
   }
 
 public:
-  ParallelImageProcessor(const std::string &outputDir = "../out-sequential",
+  ParallelImageProcessor(const std::string &outputDir = "../out-parallel",
                          int threads = 0)
       : outputPath(outputDir) {
     // if num threads is 0, use maximum available threads
@@ -258,7 +258,6 @@ public:
       {
         std::cerr << "Error processing file " << filename << ":\n"
                   << "Detailed error: " << e.what() << std::endl;
-        // Don't throw here - allow processing of other images to continue
       }
     }
     totalTime += std::chrono::high_resolution_clock::now() - startTotal;
@@ -270,16 +269,18 @@ public:
 
     int successCount = 0;
 
+#pragma omp parallel for reduction(+ : successCount) schedule(dynamic)
+
     for (size_t i = 0; i < dicomFiles.size(); ++i) {
       try {
-        std::cout << "\nProcessing image " << (i + 1) << "/"
-                  << dicomFiles.size() << ": "
-                  << fs::path(dicomFiles[i]).filename().string() << std::endl;
         processSingleImage(dicomFiles[i]);
         successCount++;
       } catch (const std::exception &e) {
-        std::cerr << "Failed to process image " << (i + 1)
-                  << ". Moving to next image." << std::endl;
+#pragma omp critical
+        {
+          std::cerr << "Failed to process image" << (i + 1)
+                    << ". Moving to next image" << std::endl;
+        }
       }
     }
 
@@ -292,6 +293,7 @@ public:
 
   void printTimingResults() const {
     std::cout << "\nProcessing Time Results:" << std::endl;
+    std::cout << "Number of Threads Used: " << numThreads << std::endl;
     std::cout << "Import Time: " << importTime.count() << " seconds"
               << std::endl;
     std::cout << "Preprocessing Time: " << preprocessTime.count() << " seconds"
@@ -309,9 +311,11 @@ public:
   }
 };
 
-int main() {
+int main(int argc, char **argv) {
   try {
-    SequentialImageProcessor processor;
+    // allow thread count to be specified as CLI arg
+    int threads = (argc > 1) ? std::stoi(argv[1]) : 0;
+    ParallelImageProcessor processor("../out-parallel", threads);
     processor.processAllImages();
   } catch (const std::exception &e) {
     std::cerr << "Fatal error: " << e.what() << std::endl;
