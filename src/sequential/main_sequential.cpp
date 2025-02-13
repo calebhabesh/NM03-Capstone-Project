@@ -97,7 +97,6 @@ private:
   }
 
 public:
-public:
   SequentialImageProcessor(const std::string &outputDir = "../out-sequential")
       : outputPath(outputDir) {
     basePath = Config::getTestDataPath() +
