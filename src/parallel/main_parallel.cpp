@@ -314,6 +314,7 @@ public:
 int main(int argc, char **argv) {
   try {
     // allow thread count to be specified as CLI arg
+    // if no arg, numthreads = 0, i.e use maximum avaialable threads
     int threads = (argc > 1) ? std::stoi(argv[1]) : 0;
     ParallelImageProcessor processor("../out-parallel", threads);
     processor.processAllImages();
