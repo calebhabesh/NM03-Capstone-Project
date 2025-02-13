@@ -1,6 +1,6 @@
 # Parallelizing Brain Image Processing using the FAST Framework and OpenMP
 
-A parallel computing system for medical diagnoses with image matching using [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization). This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging processing tasks.
+A parallel computing system to make brain imaging processing more efficient using [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization). This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging processing tasks.
 
 This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a further parallelized version (since FAST already provides some level of heterogeneous compute in their filtering/segmentation algorithms). The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
 
@@ -8,6 +8,8 @@ This requires first implementing a sequential implementation of an image process
 ![image](https://github.com/user-attachments/assets/5e62af4c-539f-4fb5-b001-0179b4682789)
 ## Prerequisites
 
+- Parallel Computer
+  - Computer with multi-core processor, capable of running multiple threads of execution simultaneously
 - CMake (version 3.16 or higher)
 - C++ compiler with C++17 support
 - FAST Framework (installed on system)
@@ -55,6 +57,12 @@ After building the target executables, the project root directory will resemble 
 
 The dataset used for this project can be obtained from the [TCIA](https://www.cancerimagingarchive.net/collection/brain-tumor-progression/). In particular, the T1+C (T1-weighted post-contrast) subsets were used. T1+C images enhance the visualization of tumor boundaries because the contrast agent highlights areas with disrupted blood-brain barriers (common with malignant tumors), and simply provides a better contrast-to-noise ratio.
 
+## Parallel Computer Used
+**IdeaPad 5 Pro 14ACN6**
+- AMD Ryzen 7 5800U (8C, 16T)
+- 16GB RAM DDR4-3200
+- NVIDIA® GeForce MX450 (2GB GDDR6)
+ 
 ## License
 
 This project uses the FAST framework for medical image computing and visualization.
