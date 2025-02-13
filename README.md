@@ -1,11 +1,15 @@
-# Brain Imaging Segmentation using the FAST Framework
+# Parallelizing Brain Image Processing using the FAST Framework and OpenMP
 
 A parallel computing system for medical diagnoses with image matching using [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization). This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging processing tasks.
 
 This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a further parallelized version (since FAST already provides some level of heterogeneous compute in their filtering/segmentation algorithms). The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
 
+<<<<<<< HEAD
 ### Initially Proposed Medical Image Processing Pipeline
 ![image](https://github.com/user-attachments/assets/fc1333fc-8ecf-4897-a88a-98a1ed8fb1d5)
+=======
+### Initially Proposed Medical Imaging Pipeline
+>>>>>>> f8e001d (added more detail to readme)
 
 ## Prerequisites
 
@@ -52,6 +56,11 @@ After building the target executables, the project root directory will resemble 
 
 ## Dataset
 
+<<<<<<< HEAD
+=======
+The dataset used for this project can be obtained from the [TCIA](https://www.cancerimagingarchive.net/collection/brain-tumor-progression/). In particular, the T1+C (T1-weighted post-contrast) subsets were used. T1+C images enhance the visualization of tumor boundaries because the contrast agent highlights areas with disrupted blood-brain barriers (common with malignant tumors), and simply provides a better contrast-to-noise ratio.
+
+>>>>>>> f8e001d (added more detail to readme)
 ## License
 
 This project uses the FAST framework for medical image computing and visualization.
