@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 
   // 6. == Export Stage ==
   // create output directory, create if it does not exist
-  auto renderToImage = RenderToImage::create(Color::White(), 512, 512);
+  auto renderToImage = RenderToImage::create(Color::Black(), 512, 512);
 
   // Define export configurations
   std::vector<std::pair<std::string, std::shared_ptr<Renderer>>> renderPairs = {
