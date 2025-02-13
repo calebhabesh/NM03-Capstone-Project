@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <iostream>
 #include <vector>
+// OpenMP directive for definitions and functions for CPP
+#include <omp.h>
 
 using namespace fast;
 namespace fs = std::filesystem;
@@ -13,6 +15,8 @@ private:
   std::vector<std::string> dicomFiles;
   std::string basePath;
   std::string outputPath;
+  // var for num threads
+  int numThreads;
 
   // Timing measurements
   std::chrono::duration<double> importTime{0};
@@ -73,23 +77,31 @@ private:
     try {
       std::string baseName = fs::path(filename).stem().string();
 
-      // Export original
-      renderToImage->removeAllRenderers();
-      renderToImage->connect(originalRenderer);
-      renderToImage->update();
-      auto exporter = ImageFileExporter::create(outputPath + "/" + baseName +
-                                                "_original.jpg");
-      exporter->connect(renderToImage->getOutputData<Image>(0));
-      exporter->update();
+// Use OpenMP critical section for file related operations
+// compiler directive "pragma" provides additional information to compiler
+// "critical" specifies that this code block should be executed by only one
+// thread at a time
+#pragma omp critical
+      {
 
-      // Export final result
-      renderToImage->removeAllRenderers();
-      renderToImage->connect(dilationRenderer);
-      renderToImage->update();
-      exporter = ImageFileExporter::create(outputPath + "/" + baseName +
-                                           "_processed.jpg");
-      exporter->connect(renderToImage->getOutputData<Image>(0));
-      exporter->update();
+        // Export original
+        renderToImage->removeAllRenderers();
+        renderToImage->connect(originalRenderer);
+        renderToImage->update();
+        auto exporter = ImageFileExporter::create(outputPath + "/" + baseName +
+                                                  "_original.jpg");
+        exporter->connect(renderToImage->getOutputData<Image>(0));
+        exporter->update();
+
+        // Export final result
+        renderToImage->removeAllRenderers();
+        renderToImage->connect(dilationRenderer);
+        renderToImage->update();
+        exporter = ImageFileExporter::create(outputPath + "/" + baseName +
+                                             "_processed.jpg");
+        exporter->connect(renderToImage->getOutputData<Image>(0));
+        exporter->update();
+      }
     } catch (Exception &e) {
       std::cerr << "Error in export stage: " << e.what() << std::endl;
       throw;
@@ -97,9 +109,13 @@ private:
   }
 
 public:
-public:
-  SequentialImageProcessor(const std::string &outputDir = "../out-sequential")
+  ParallelImageProcessor(const std::string &outputDir = "../out-sequential",
+                         int threads = 0)
       : outputPath(outputDir) {
+    // if num threads is 0, use maximum available threads
+    numThreads = (threads == 0) ? omp_get_max_threads() : threads;
+    omp_set_num_threads(numThreads);
+
     basePath = Config::getTestDataPath() +
                "Brain-Tumor-Progression/PGBM-017/09-17-1997-RA FH MR RCBV "
                "OP-85753/16.000000-T1post-19554/";
@@ -141,8 +157,12 @@ public:
     auto startTotal = std::chrono::high_resolution_clock::now();
 
     try {
-      std::cout << "\nProcessing: " << fs::path(filename).filename()
-                << std::endl;
+#pragma omp critical
+      {
+        std::cout << "\nProcessing: " << fs::path(filename).filename()
+                  << " on thread " << omp_get_thread_num() << "/"
+                  << omp_get_num_threads() << std::endl;
+      }
 
       // Import Stage
       auto startImport = std::chrono::high_resolution_clock::now();
@@ -234,19 +254,22 @@ public:
       exportTime += std::chrono::high_resolution_clock::now() - startExport;
 
     } catch (Exception &e) {
-      std::cerr << "Error processing file " << filename << ":\n"
-                << "Detailed error: " << e.what() << std::endl;
-      // Don't throw here - allow processing of other images to continue
+#pragma omp critical
+      {
+        std::cerr << "Error processing file " << filename << ":\n"
+                  << "Detailed error: " << e.what() << std::endl;
+        // Don't throw here - allow processing of other images to continue
+      }
     }
-
     totalTime += std::chrono::high_resolution_clock::now() - startTotal;
   }
 
   void processAllImages() {
-    std::cout << "Starting sequential processing of " << dicomFiles.size()
-              << " images..." << std::endl;
+    std::cout << "Starting paralllel processing of " << dicomFiles.size()
+              << " images using " << numThreads << " threads... " << std::endl;
 
     int successCount = 0;
+
     for (size_t i = 0; i < dicomFiles.size(); ++i) {
       try {
         std::cout << "\nProcessing image " << (i + 1) << "/"
