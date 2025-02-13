@@ -19,7 +19,9 @@ This requires first implementing a sequential implementation of an image process
 mkdir build
 cd build
 cmake .. -DFAST_DIR=/opt/fast/cmake/ # default installation location, varies if built from source
-cmake --build . --config Release 
+cmake --build . --config Release
+# Run Executable (test pipeline example)
+./test_pipeline 
 ```
 
 ## Project Structure
