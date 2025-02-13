@@ -4,7 +4,7 @@ A parallel computing system for medical diagnoses with image matching using [FAS
 
 This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a further parallelized version (since FAST already provides some level of heterogeneous compute in their filtering/segmentation algorithms). The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
 
-### Initially Proposed Medical Imaging Pipeline
+### Initially Proposed Medical Image Processing Pipeline
 ![image](https://github.com/user-attachments/assets/fc1333fc-8ecf-4897-a88a-98a1ed8fb1d5)
 
 ## Prerequisites
