@@ -4,10 +4,11 @@ A parallel computing system to make brain imaging processing more efficient usin
 
 This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a further parallelized version (since FAST already provides some level of heterogeneous compute in their filtering/segmentation algorithms). The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
 
-### Initial Medical Imaging Pipeline
-![image](https://github.com/user-attachments/assets/5e62af4c-539f-4fb5-b001-0179b4682789)
-### Revised Medical Imaging Pipeline
-![image](https://github.com/user-attachments/assets/397158f6-dcc5-494d-9a9d-bf13087a8735)
+### Initial Medical Imaging Processing Pipeline
+![image](https://github.com/user-attachments/assets/6e9675cf-eccb-4523-985c-341763ced9fc)
+### Revised Medical Imaging Processing Pipeline
+![image](https://github.com/user-attachments/assets/85b27a61-17f8-46a0-b030-c0a6bbc28407)
+
 ## Prerequisites
 
 - Parallel Computer
