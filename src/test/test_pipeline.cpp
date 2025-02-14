@@ -1,5 +1,4 @@
 // Add modules from includes.hpp
-#include "FAST/Visualization/RenderToImage/RenderToImage.hpp"
 #include "FAST/includes.hpp"
 
 #include <sys/types.h>
@@ -13,7 +12,8 @@ void exportImages(
         &renderPairs) {
 
   // Create output directory
-  system(("rm -rf " + outputPath + " && mkdir -p " + outputPath).c_str());
+  system(("mkdir -p " + outputPath + " && cd " + outputPath + " && rm -rf *")
+             .c_str());
 
   // Export each image
   for (const auto &[filename, renderer] : renderPairs) {

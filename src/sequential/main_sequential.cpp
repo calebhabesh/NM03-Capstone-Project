@@ -1,4 +1,3 @@
-#include "FAST/Visualization/RenderToImage/RenderToImage.hpp"
 #include "FAST/includes.hpp"
 #include <chrono>
 #include <filesystem>
@@ -38,7 +37,8 @@ private:
   }
   void setupOutputDirectory() {
     try {
-      if (system(("rm -rf " + outputPath + " && mkdir -p " + outputPath)
+      if (system(("mkdir -p " + outputPath + " && cd " + outputPath +
+                  " && rm -rf *")
                      .c_str()) != 0) {
         throw std::runtime_error("Failed to setup output directory: " +
                                  outputPath);
