@@ -38,18 +38,19 @@ private:
   }
   void setupOutputDirectory() {
     try {
-      // Remove and recreate directory in one command, similar to test code
-      if (system(("rm -rf " + outputPath + " && mkdir -p " + outputPath)
+      if (system(("mkdir -p " + outputPath + " && cd " + outputPath +
+                  " && rm -rf *")
                      .c_str()) != 0) {
         throw std::runtime_error("Failed to setup output directory: " +
                                  outputPath);
       }
-      std::cout << "Created clean output directory: " + outputPath << std::endl;
+      std::cout << "Created output directory: " + outputPath << std::endl;
     } catch (const std::exception &e) {
       throw std::runtime_error("Error setting up output directory: " +
                                std::string(e.what()));
     }
   }
+
   void verifyProcessingStep(std::shared_ptr<ProcessObject> process,
                             const std::string &stepName) {
     try {
