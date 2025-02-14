@@ -38,19 +38,17 @@ private:
   }
   void setupOutputDirectory() {
     try {
-      if (system(("mkdir -p " + outputPath + " && cd " + outputPath +
-                  " && rm -rf *")
+      if (system(("rm -rf " + outputPath + " && mkdir -p " + outputPath)
                      .c_str()) != 0) {
         throw std::runtime_error("Failed to setup output directory: " +
                                  outputPath);
       }
-      std::cout << "Created output directory: " + outputPath << std::endl;
+      std::cout << "Created clean output directory: " + outputPath << std::endl;
     } catch (const std::exception &e) {
       throw std::runtime_error("Error setting up output directory: " +
                                std::string(e.what()));
     }
   }
-
   void verifyProcessingStep(std::shared_ptr<ProcessObject> process,
                             const std::string &stepName) {
     try {
@@ -59,7 +57,6 @@ private:
       if (!output) {
         throw Exception("No output data produced at " + stepName);
       }
-      std::cout << "Successfully completed: " << stepName << std::endl;
     } catch (Exception &e) {
       std::cerr << "Error at " << stepName << ": " << e.what() << std::endl;
       throw;
@@ -141,8 +138,7 @@ public:
     auto startTotal = std::chrono::high_resolution_clock::now();
 
     try {
-      std::cout << "\nProcessing: " << fs::path(filename).filename()
-                << std::endl;
+      std::cout << "Processing: " << fs::path(filename).filename() << std::endl;
 
       // Import Stage
       auto startImport = std::chrono::high_resolution_clock::now();
@@ -243,15 +239,21 @@ public:
   }
 
   void processAllImages() {
-    std::cout << "Starting sequential processing of " << dicomFiles.size()
-              << " images..." << std::endl;
+    // Set reporting method for different types of messages
+    Reporter::setGlobalReportMethod(Reporter::INFO,
+                                    Reporter::NONE); // Disable INFO messages
+    Reporter::setGlobalReportMethod(Reporter::WARNING,
+                                    Reporter::COUT); // Keep warnings to console
+    Reporter::setGlobalReportMethod(Reporter::ERROR,
+                                    Reporter::COUT); // Keep errors to console
+
+    std::cout << "\n=== Starting Sequential Processing ===\n" << std::endl;
+    std::cout << "Found " << dicomFiles.size() << " images to process"
+              << std::endl;
 
     int successCount = 0;
     for (size_t i = 0; i < dicomFiles.size(); ++i) {
       try {
-        std::cout << "\nProcessing image " << (i + 1) << "/"
-                  << dicomFiles.size() << ": "
-                  << fs::path(dicomFiles[i]).filename().string() << std::endl;
         processSingleImage(dicomFiles[i]);
         successCount++;
       } catch (const std::exception &e) {
@@ -268,7 +270,7 @@ public:
   }
 
   void printTimingResults() const {
-    std::cout << "\nProcessing Time Results:" << std::endl;
+    std::cout << "\n=== Processing Time Results ===\n" << std::endl;
     std::cout << "Import Time: " << importTime.count() << " seconds"
               << std::endl;
     std::cout << "Preprocessing Time: " << preprocessTime.count() << " seconds"
@@ -288,6 +290,14 @@ public:
 
 int main() {
   try {
+    // Set reporting method for different types of messages
+    Reporter::setGlobalReportMethod(Reporter::INFO,
+                                    Reporter::NONE); // Disable INFO messages
+    Reporter::setGlobalReportMethod(Reporter::WARNING,
+                                    Reporter::COUT); // Keep warnings to console
+    Reporter::setGlobalReportMethod(Reporter::ERROR,
+                                    Reporter::COUT); // Keep errors to console
+
     SequentialImageProcessor processor;
     processor.processAllImages();
   } catch (const std::exception &e) {

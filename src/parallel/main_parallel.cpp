@@ -33,6 +33,7 @@ private:
   std::mutex outputMutex;
   std::vector<TimingData> threadTimings;
   double exportTime = 0;
+
   std::shared_ptr<RenderToImage> renderToImage;
   std::atomic<size_t> completedImages{0};
   const size_t PROGRESS_REPORT_INTERVAL = 5;
@@ -337,7 +338,7 @@ public:
       totalTiming.totalTime += timing.totalTime;
     }
 
-    std::cout << "\nProcessing Time Results:" << std::endl;
+    std::cout << "\n=== Processing Time Results ===\n" << std::endl;
     std::cout << "Import Time: " << totalTiming.importTime << " seconds"
               << std::endl;
     std::cout << "Preprocessing Time: " << totalTiming.preprocessTime
