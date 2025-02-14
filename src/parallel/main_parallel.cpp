@@ -91,6 +91,11 @@ private:
     ProcessedImageData result;
     result.filename = filename;
 
+#pragma omp critical
+    {
+      std::cout << "Processing: \"" << fs::path(filename).filename().string()
+                << "\"" << std::endl;
+    }
     auto startTotal = std::chrono::high_resolution_clock::now();
 
     try {
@@ -182,14 +187,14 @@ private:
               .count();
 
       // Update progress
-      size_t completed = completedImages.fetch_add(1) + 1;
+      /* size_t completed = completedImages.fetch_add(1) + 1;
       if (completed % PROGRESS_REPORT_INTERVAL == 0) {
         std::lock_guard<std::mutex> lock(outputMutex);
         std::cout << "\rProgress: " << completed << "/" << dicomFiles.size()
                   << " (" << (completed * 100 / dicomFiles.size()) << "%)"
                   << std::flush;
       }
-
+*/
     } catch (Exception &e) {
       std::lock_guard<std::mutex> lock(outputMutex);
       std::cerr << "Error processing file " << filename << ":\n"
@@ -294,9 +299,10 @@ public:
   }
 
   void processAllImages(size_t batchSize = DEFAULT_BATCH_SIZE) {
-    std::cout << "Starting optimized parallel processing of "
-              << dicomFiles.size() << " images using " << omp_get_max_threads()
-              << " threads..." << std::endl;
+    std::cout << "\n=== Starting Parallel Processing ===\n" << std::endl;
+    std::cout << "Found " << dicomFiles.size() << " images to process"
+              << std::endl;
+    std::cout << "Using " << omp_get_max_threads() << " threads\n" << std::endl;
 
     int successCount = 0;
 
