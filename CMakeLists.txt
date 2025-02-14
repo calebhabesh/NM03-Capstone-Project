@@ -7,6 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
 find_package(FAST REQUIRED)
+find_package(OpenMP REQUIRED)
 
 include(${FAST_USE_FILE})
 
@@ -20,7 +21,7 @@ target_include_directories(img_processing_sequential PRIVATE ${CMAKE_SOURCE_DIR}
 # Make executable for parallel code
 add_executable(img_processing_parallel src/parallel/main_parallel.cpp)
 add_dependencies(img_processing_parallel fast_copy)
-target_link_libraries(img_processing_parallel ${FAST_LIBRARIES})
+target_link_libraries(img_processing_parallel ${FAST_LIBRARIES} OpenMP::OpenMP_CXX) # add openMP lib
 target_include_directories(img_processing_parallel PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 
 # Make executable for prototype/test code
