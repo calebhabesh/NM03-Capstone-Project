@@ -24,11 +24,6 @@ add_dependencies(img_processing_parallel fast_copy)
 target_link_libraries(img_processing_parallel ${FAST_LIBRARIES} OpenMP::OpenMP_CXX) # add openMP lib
 target_include_directories(img_processing_parallel PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 
-# Enable OpenMP for parallel executable
-if(OpenMP_CXX_FOUND)
-  target_compile_options(img_processing_parallel PRIVATE ${OpenMP_CXX_FLAGS})
-endif()
-
 # Make executable for prototype/test code
 add_executable(test_pipeline src/test/test_pipeline.cpp)
 add_dependencies(test_pipeline fast_copy)
