@@ -9,7 +9,7 @@ This requires first implementing a sequential implementation of an image process
 ## Prerequisites
 
 - Parallel Computer
-  - Computer with multi-core processor, capable of running multiple threads of execution simultaneously
+  - Computer with a multi-core processor, capable of running multiple threads of execution simultaneously
 - CMake (version 3.16 or higher)
 - C++ compiler with C++17 support
 - FAST Framework (installed on system)
