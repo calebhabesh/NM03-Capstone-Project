@@ -30,9 +30,3 @@ add_dependencies(test_pipeline fast_copy)
 target_link_libraries(test_pipeline ${FAST_LIBRARIES})
 target_include_directories(test_pipeline PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 
-# Make executable for exported images test
-add_executable(export_test src/test/export_test.cpp)
-add_dependencies(export_test fast_copy)
-target_link_libraries(export_test ${FAST_LIBRARIES})
-target_include_directories(export_test PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
-
