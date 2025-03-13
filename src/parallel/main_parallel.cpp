@@ -329,7 +329,7 @@ public:
     std::cout << "Post-processing Time: " << totalTiming.postprocessTime
               << " seconds" << std::endl;
     std::cout << "Export Time: " << exportTime << " seconds" << std::endl;
-    std::cout << "Total Time: " << totalTiming.totalTime << " seconds"
+    std::cout << "Total Time: " << totalTiming.totalTime + exportTime << " seconds"
               << std::endl;
     std::cout << "Average Time per Image: "
               << totalTiming.totalTime / dicomFiles.size() << " seconds"
