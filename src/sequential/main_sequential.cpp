@@ -221,12 +221,14 @@ public:
         exportProcessedImage(filename, renderToImage, originalRenderer,
                              dilationRenderer);
         exportTime += std::chrono::high_resolution_clock::now() - startExport;
+
+        totalTime += std::chrono::high_resolution_clock::now() - startTotal;
     } catch (Exception &e) {
         std::cerr << "Error processing file " << filename << ":\n"
                   << "Detailed error: " << e.what() << std::endl;
         // Don't throw here - allow processing of other images to continue
     }
-    totalTime += std::chrono::high_resolution_clock::now() - startTotal;
+    
 }
 
   void processAllImages() {
@@ -272,7 +274,13 @@ public:
               << " seconds" << std::endl;
     std::cout << "Export Time: " << exportTime.count() << " seconds"
               << std::endl;
-    std::cout << "Total Time: " << totalTime.count() << " seconds" << std::endl;
+    double calculatedTotalTime = importTime.count() + preprocessTime.count() +
+                                 segmentationTime.count() +
+                                 postprocessTime.count() + exportTime.count();
+    std::cout << "Calculated Total Time: " << calculatedTotalTime << " seconds" 
+              << std::endl;
+    std::cout << "Total Time: " << totalTime.count() << " seconds"
+              << std::endl;
     std::cout << "Average Time per Image: "
               << totalTime.count() / dicomFiles.size() << " seconds"
               << std::endl;
