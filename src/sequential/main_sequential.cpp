@@ -97,9 +97,7 @@ private:
 public:
   SequentialImageProcessor(const std::string &outputDir = "../out-sequential")
       : outputPath(outputDir) {
-    basePath = Config::getTestDataPath() +
-               "Brain-Tumor-Progression/PGBM-017/09-17-1997-RA FH MR RCBV "
-               "OP-85753/16.000000-T1post-19554/";
+    basePath = "/home/rayyan/Capstone/Formatted-Dataset/T1-Post-Combined-P001-P020";
 
     setupOutputDirectory();
     loadDICOMFiles();
@@ -108,9 +106,9 @@ public:
   void loadDICOMFiles() {
     try {
       std::vector<std::pair<std::string, int>> fileNumberPairs;
-
-      for (const auto &entry : fs::directory_iterator(basePath)) {
-        if (entry.path().extension() == ".dcm") {
+      // Use recursive_directory_iterator to traverse subdirectories 
+      for (const auto &entry : fs::recursive_directory_iterator(basePath)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".dcm") {
           std::string filepath = entry.path().string();
           int fileNumber = extractFileNumber(entry.path().filename().string());
           fileNumberPairs.push_back({filepath, fileNumber});
@@ -136,107 +134,100 @@ public:
 
   void processSingleImage(const std::string &filename) {
     auto startTotal = std::chrono::high_resolution_clock::now();
-
     try {
-      std::cout << "Processing: " << fs::path(filename).filename() << std::endl;
+        std::cout << "Processing: " << fs::path(filename).filename() << std::endl;
+        // Import Stage
+        auto startImport = std::chrono::high_resolution_clock::now();
+        auto importer = DICOMFileImporter::create(filename);
+        importer->setLoadSeries(false);
+        verifyProcessingStep(importer, "Import Stage");
+        importTime += std::chrono::high_resolution_clock::now() - startImport;
 
-      // Import Stage
-      auto startImport = std::chrono::high_resolution_clock::now();
-      auto importer = DICOMFileImporter::create(filename);
-      importer->setLoadSeries(false);
-      verifyProcessingStep(importer, "Import Stage");
-      importTime += std::chrono::high_resolution_clock::now() - startImport;
+        // Preprocessing Stage
+        auto startPreprocess = std::chrono::high_resolution_clock::now();
+        auto normalize =
+            IntensityNormalization::create(0.5f, 2.5f, 0.0f, 10000.0f);
+        normalize->connect(importer);
+        verifyProcessingStep(normalize, "Normalization");
+        auto clipping = IntensityClipping::create(0.68f, 4000.0f);
+        clipping->connect(normalize);
+        verifyProcessingStep(clipping, "Clipping");
+        auto medianfilter = VectorMedianFilter::create(5);
+        medianfilter->connect(clipping);
+        verifyProcessingStep(medianfilter, "Median Filter");
+        auto sharpen = ImageSharpening::create(2.0f, 0.5f, 9);
+        sharpen->connect(medianfilter);
+        verifyProcessingStep(sharpen, "Sharpening");
+        preprocessTime +=
+            std::chrono::high_resolution_clock::now() - startPreprocess;
 
-      // Preprocessing Stage
-      auto startPreprocess = std::chrono::high_resolution_clock::now();
+        // Get image dimensions
+        auto originalImage = importer->getOutputData<Image>(0);
+        int width = originalImage->getWidth();
+        int height = originalImage->getHeight();
 
-      auto normalize =
-          IntensityNormalization::create(0.5f, 2.5f, 0.0f, 10000.0f);
-      normalize->connect(importer);
-      verifyProcessingStep(normalize, "Normalization");
+        // Segmentation Stage
+        auto startSegmentation = std::chrono::high_resolution_clock::now();
 
-      auto clipping = IntensityClipping::create(0.68f, 4000.0f);
-      clipping->connect(normalize);
-      verifyProcessingStep(clipping, "Clipping");
+        // Dynamically generate seed points based on image dimensions
+        std::vector<Vector3i> seedPoints;
+        int centerX = width / 2;
+        int centerY = height / 2;
+        int radius = std::min(width, height) / 4; // Adjust radius dynamically
 
-      auto medianfilter = VectorMedianFilter::create(5);
-      medianfilter->connect(clipping);
-      verifyProcessingStep(medianfilter, "Median Filter");
-
-      auto sharpen = ImageSharpening::create(2.0f, 0.5f, 9);
-      sharpen->connect(medianfilter);
-      verifyProcessingStep(sharpen, "Sharpening");
-
-      preprocessTime +=
-          std::chrono::high_resolution_clock::now() - startPreprocess;
-
-      // Segmentation Stage
-      auto startSegmentation = std::chrono::high_resolution_clock::now();
-
-      auto regionGrowing =
-          SeededRegionGrowing::create(0.74f, 0.91f,
-                                      std::vector<Vector3i>{{300, 256, 0},
-                                                            {320, 256, 0},
-                                                            {340, 256, 0},
-                                                            {300, 236, 0},
-                                                            {300, 276, 0},
-                                                            {212, 256, 0},
-                                                            {192, 256, 0},
-                                                            {172, 256, 0},
-                                                            {212, 236, 0},
-                                                            {212, 276, 0}});
-      regionGrowing->connect(sharpen);
-      // Add additional seed points in a grid pattern
-
-      for (int x = 150; x < 362; x += 30) {
-        for (int y = 150; y < 362; y += 30) {
-          regionGrowing->addSeedPoint(x, y);
+        for (int x = centerX - radius; x <= centerX + radius; x += radius / 2) {
+            for (int y = centerY - radius; y <= centerY + radius; y += radius / 2) {
+                // Clamp seed points to image boundaries
+                int clampedX = std::max(0, std::min(x, width - 1));
+                int clampedY = std::max(0, std::min(y, height - 1));
+                seedPoints.emplace_back(clampedX, clampedY, 0);
+            }
         }
-      }
-      verifyProcessingStep(regionGrowing, "Region Growing");
 
-      segmentationTime +=
-          std::chrono::high_resolution_clock::now() - startSegmentation;
+        auto regionGrowing = SeededRegionGrowing::create(0.74f, 0.91f, seedPoints);
+        regionGrowing->connect(sharpen);
 
-      // Post-processing Stage
-      auto startPostprocess = std::chrono::high_resolution_clock::now();
+        // Add additional seed points in a grid pattern
+        for (int x = std::max(0, width / 4); x < width * 3 / 4; x += width / 8) {
+            for (int y = std::max(0, height / 4); y < height * 3 / 4; y += height / 8) {
+                regionGrowing->addSeedPoint(x, y);
+            }
+        }
 
-      auto caster = ImageCaster::create(TYPE_UINT8);
-      caster->connect(regionGrowing);
-      verifyProcessingStep(caster, "Type Casting");
+        verifyProcessingStep(regionGrowing, "Region Growing");
+        segmentationTime +=
+            std::chrono::high_resolution_clock::now() - startSegmentation;
 
-      auto dilation = Dilation::create(3);
-      dilation->connect(caster);
-      verifyProcessingStep(dilation, "Dilation");
+        // Post-processing Stage
+        auto startPostprocess = std::chrono::high_resolution_clock::now();
+        auto caster = ImageCaster::create(TYPE_UINT8);
+        caster->connect(regionGrowing);
+        verifyProcessingStep(caster, "Type Casting");
+        auto dilation = Dilation::create(3);
+        dilation->connect(caster);
+        verifyProcessingStep(dilation, "Dilation");
+        postprocessTime +=
+            std::chrono::high_resolution_clock::now() - startPostprocess;
 
-      postprocessTime +=
-          std::chrono::high_resolution_clock::now() - startPostprocess;
-
-      // Export Stage
-      auto startExport = std::chrono::high_resolution_clock::now();
-
-      LabelColors labelColors;
-      labelColors[1] = Color::White();
-
-      auto renderToImage = RenderToImage::create(Color::Black(), 512, 512);
-      auto originalRenderer = ImageRenderer::create()->connect(importer);
-      auto dilationRenderer =
-          SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
-              ->connect(dilation);
-
-      exportProcessedImage(filename, renderToImage, originalRenderer,
-                           dilationRenderer);
-
-      exportTime += std::chrono::high_resolution_clock::now() - startExport;
-
+        // Export Stage
+        auto startExport = std::chrono::high_resolution_clock::now();
+        LabelColors labelColors;
+        labelColors[1] = Color::White();
+        auto renderToImage = RenderToImage::create(Color::Black(), 512, 512);
+        auto originalRenderer = ImageRenderer::create()->connect(importer);
+        auto dilationRenderer =
+            SegmentationRenderer::create(labelColors, 0.6f, 1.0f, 2)
+                ->connect(dilation);
+        exportProcessedImage(filename, renderToImage, originalRenderer,
+                             dilationRenderer);
+        exportTime += std::chrono::high_resolution_clock::now() - startExport;
     } catch (Exception &e) {
-      std::cerr << "Error processing file " << filename << ":\n"
-                << "Detailed error: " << e.what() << std::endl;
-      // Don't throw here - allow processing of other images to continue
+        std::cerr << "Error processing file " << filename << ":\n"
+                  << "Detailed error: " << e.what() << std::endl;
+        // Don't throw here - allow processing of other images to continue
     }
-
     totalTime += std::chrono::high_resolution_clock::now() - startTotal;
-  }
+}
 
   void processAllImages() {
     // Set reporting method for different types of messages
