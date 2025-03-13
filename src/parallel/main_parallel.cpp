@@ -87,122 +87,99 @@ private:
   }
 
   ProcessedImageData processSingleImage(const std::string &filename,
-                                        TimingData &timing) {
+                                      TimingData &timing) {
     ProcessedImageData result;
     result.filename = filename;
 
 #pragma omp critical
     {
-      std::cout << "Processing: \"" << fs::path(filename).filename().string()
-                << "\"" << std::endl;
+        std::cout << "Processing: \"" << fs::path(filename).filename().string()
+                  << "\"" << std::endl;
     }
+
     auto startTotal = std::chrono::high_resolution_clock::now();
-
     try {
-      // Import Stage
-      auto startImport = std::chrono::high_resolution_clock::now();
-      auto importer = DICOMFileImporter::create(filename);
-      importer->setLoadSeries(false);
-      verifyProcessingStep(importer, "Import", filename);
-      timing.importTime +=
-          std::chrono::duration<double>(
-              std::chrono::high_resolution_clock::now() - startImport)
-              .count();
+        // Import Stage
+        auto startImport = std::chrono::high_resolution_clock::now();
+        auto importer = DICOMFileImporter::create(filename);
+        importer->setLoadSeries(false);
+        verifyProcessingStep(importer, "Import", filename);
+        timing.importTime +=
+            std::chrono::duration<double>(
+                std::chrono::high_resolution_clock::now() - startImport)
+                .count();
+        result.originalImage = importer->getOutputData<Image>(0);
 
-      result.originalImage = importer->getOutputData<Image>(0);
+        // Get image dimensions
+        int width = result.originalImage->getWidth();
+        int height = result.originalImage->getHeight();
 
-      // Preprocessing Stage
-      auto startPreprocess = std::chrono::high_resolution_clock::now();
+        // Preprocessing Stage
+        auto startPreprocess = std::chrono::high_resolution_clock::now();
+        auto normalize =
+            IntensityNormalization::create(0.5f, 2.5f, 0.0f, 10000.0f);
+        normalize->connect(importer);
+        auto clipping = IntensityClipping::create(0.68f, 4000.0f);
+        clipping->connect(normalize);
+        auto medianfilter = VectorMedianFilter::create(5);
+        medianfilter->connect(clipping);
+        auto sharpen = ImageSharpening::create(2.0f, 0.5f, 9);
+        sharpen->connect(medianfilter);
+        verifyProcessingStep(sharpen, "Preprocessing", filename);
+        timing.preprocessTime +=
+            std::chrono::duration<double>(
+                std::chrono::high_resolution_clock::now() - startPreprocess)
+                .count();
 
-      auto normalize =
-          IntensityNormalization::create(0.5f, 2.5f, 0.0f, 10000.0f);
-      normalize->connect(importer);
+        // Segmentation Stage
+        auto startSegmentation = std::chrono::high_resolution_clock::now();
 
-      auto clipping = IntensityClipping::create(0.68f, 4000.0f);
-      clipping->connect(normalize);
+        // Dynamically generate seed points based on image dimensions
+        std::vector<Vector3i> seedPoints;
+        int centerX = width / 2;
+        int centerY = height / 2;
+        int radius = std::min(width, height) / 4; // Adjust radius dynamically
 
-      auto medianfilter = VectorMedianFilter::create(5);
-      medianfilter->connect(clipping);
-
-      auto sharpen = ImageSharpening::create(2.0f, 0.5f, 9);
-      sharpen->connect(medianfilter);
-
-      verifyProcessingStep(sharpen, "Preprocessing", filename);
-
-      timing.preprocessTime +=
-          std::chrono::duration<double>(
-              std::chrono::high_resolution_clock::now() - startPreprocess)
-              .count();
-
-      // Segmentation Stage
-      auto startSegmentation = std::chrono::high_resolution_clock::now();
-
-      auto regionGrowing =
-          SeededRegionGrowing::create(0.74f, 0.91f,
-                                      std::vector<Vector3i>{{300, 256, 0},
-                                                            {320, 256, 0},
-                                                            {340, 256, 0},
-                                                            {300, 236, 0},
-                                                            {300, 276, 0},
-                                                            {212, 256, 0},
-                                                            {192, 256, 0},
-                                                            {172, 256, 0},
-                                                            {212, 236, 0},
-                                                            {212, 276, 0}});
-      regionGrowing->connect(sharpen);
-
-      for (int x = 150; x < 362; x += 30) {
-        for (int y = 150; y < 362; y += 30) {
-          regionGrowing->addSeedPoint(x, y);
+        for (int x = centerX - radius; x <= centerX + radius; x += radius / 2) {
+            for (int y = centerY - radius; y <= centerY + radius; y += radius / 2) {
+                // Clamp seed points to image boundaries
+                int clampedX = std::max(0, std::min(x, width - 1));
+                int clampedY = std::max(0, std::min(y, height - 1));
+                seedPoints.emplace_back(clampedX, clampedY, 0);
+            }
         }
-      }
-      verifyProcessingStep(regionGrowing, "Segmentation", filename);
 
-      timing.segmentationTime +=
-          std::chrono::duration<double>(
-              std::chrono::high_resolution_clock::now() - startSegmentation)
-              .count();
+        auto regionGrowing = SeededRegionGrowing::create(0.74f, 0.91f, seedPoints);
+        regionGrowing->connect(sharpen);
+        verifyProcessingStep(regionGrowing, "Segmentation", filename);
+        timing.segmentationTime +=
+            std::chrono::duration<double>(
+                std::chrono::high_resolution_clock::now() - startSegmentation)
+                .count();
 
-      // Post-processing Stage
-      auto startPostprocess = std::chrono::high_resolution_clock::now();
-
-      auto caster = ImageCaster::create(TYPE_UINT8);
-      caster->connect(regionGrowing);
-
-      auto dilation = Dilation::create(3);
-      dilation->connect(caster);
-
-      verifyProcessingStep(dilation, "Post-processing", filename);
-
-      result.processedImage = dilation->getOutputData<Image>(0);
-
-      timing.postprocessTime +=
-          std::chrono::duration<double>(
-              std::chrono::high_resolution_clock::now() - startPostprocess)
-              .count();
-
-      timing.totalTime +=
-          std::chrono::duration<double>(
-              std::chrono::high_resolution_clock::now() - startTotal)
-              .count();
-
-      // Update progress
-      /* size_t completed = completedImages.fetch_add(1) + 1;
-      if (completed % PROGRESS_REPORT_INTERVAL == 0) {
-        std::lock_guard<std::mutex> lock(outputMutex);
-        std::cout << "\rProgress: " << completed << "/" << dicomFiles.size()
-                  << " (" << (completed * 100 / dicomFiles.size()) << "%)"
-                  << std::flush;
-      }
-*/
+        // Post-processing Stage
+        auto startPostprocess = std::chrono::high_resolution_clock::now();
+        auto caster = ImageCaster::create(TYPE_UINT8);
+        caster->connect(regionGrowing);
+        auto dilation = Dilation::create(3);
+        dilation->connect(caster);
+        verifyProcessingStep(dilation, "Post-processing", filename);
+        result.processedImage = dilation->getOutputData<Image>(0);
+        timing.postprocessTime +=
+            std::chrono::duration<double>(
+                std::chrono::high_resolution_clock::now() - startPostprocess)
+                .count();
+        timing.totalTime +=
+            std::chrono::duration<double>(
+                std::chrono::high_resolution_clock::now() - startTotal)
+                .count();
     } catch (Exception &e) {
-      std::lock_guard<std::mutex> lock(outputMutex);
-      std::cerr << "Error processing file " << filename << ":\n"
-                << "Detailed error: " << e.what() << std::endl;
+        std::lock_guard<std::mutex> lock(outputMutex);
+        std::cerr << "Error processing file " << filename << ": "
+                  << "Detailed error: " << e.what() << std::endl;
     }
-
     return result;
-  }
+}
 
   void exportBatch(const std::vector<ProcessedImageData> &batch) {
     auto startExport = std::chrono::high_resolution_clock::now();
@@ -259,9 +236,7 @@ private:
 public:
   OptimizedParallelProcessor(const std::string &outputDir = "../out-parallel")
       : outputPath(outputDir) {
-    basePath = Config::getTestDataPath() +
-               "Brain-Tumor-Progression/PGBM-017/09-17-1997-RA FH MR RCBV "
-               "OP-85753/16.000000-T1post-19554/";
+    basePath = "/home/rayyan/Capstone/Formatted-Dataset/T1-Post-Combined-P001-P020";
 
     setupOutputDirectory();
     loadDICOMFiles();
@@ -272,9 +247,9 @@ public:
   void loadDICOMFiles() {
     try {
       std::vector<std::pair<std::string, int>> fileNumberPairs;
-
-      for (const auto &entry : fs::directory_iterator(basePath)) {
-        if (entry.path().extension() == ".dcm") {
+      // Use recursive_directory_iterator to traverse subdirectories 
+      for (const auto &entry : fs::recursive_directory_iterator(basePath)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".dcm") {
           std::string filepath = entry.path().string();
           int fileNumber = extractFileNumber(entry.path().filename().string());
           fileNumberPairs.push_back({filepath, fileNumber});
