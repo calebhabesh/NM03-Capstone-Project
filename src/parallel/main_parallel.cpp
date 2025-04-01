@@ -26,8 +26,11 @@ private:
   std::mutex outputMutex;
   std::shared_ptr<RenderToImage> renderToImage;
   std::atomic<size_t> completedImages{0};
-  const size_t PROGRESS_REPORT_INTERVAL = 5;
-  static const size_t DEFAULT_BATCH_SIZE = 20;
+
+  // Corresponds to the batches that are divided into worker threads
+  // Patient datasets range between 21-25 .dcm files, so just set to largest
+  // possible num of dcm files in a patient directory
+  static const size_t DEFAULT_BATCH_SIZE = 25;
 
   int extractFileNumber(const std::string &filename) {
     size_t dashPos = filename.find_last_of('-');
@@ -136,10 +139,8 @@ private:
       regionGrowing->connect(sharpen);
 
       // Add additional seed points in a grid pattern
-#pragma omp parallel for collapse(2) if (omp_get_level() < 2)
       for (int x = width / 4; x < width * 3 / 4; x += width / 10) {
         for (int y = height / 4; y < height * 3 / 4; y += height / 10) {
-#pragma omp critical
           {
             regionGrowing->addSeedPoint(x, y);
           }
@@ -332,7 +333,7 @@ public:
             std::min(batchSize, dicomFiles.size() - batchStart);
         std::vector<ProcessedImageData> batchResults(currentBatchSize);
 
-#pragma omp parallel for schedule(guided) reduction(+ : successCount)
+#pragma omp parallel for schedule(auto) reduction(+ : successCount)
         for (size_t i = 0; i < currentBatchSize; ++i) {
           size_t fileIndex = batchStart + i;
           batchResults[i] = processSingleImage(dicomFiles[fileIndex]);
@@ -398,8 +399,6 @@ int main(int argc, char *argv[]) {
                                     Reporter::COUT); // Keep errors to console
 
     omp_set_num_threads(16);
-    omp_set_nested(1);
-    omp_set_max_active_levels(2);
 
     OptimizedParallelProcessor processor;
     processor.processAllPatients();
