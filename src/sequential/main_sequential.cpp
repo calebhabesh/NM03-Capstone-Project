@@ -1,5 +1,4 @@
-#include "FAST/includes.hpp"
-#include <chrono>
+#include "FAST/FAST_directives.hpp"
 #include <filesystem>
 #include <iostream>
 #include <vector>
@@ -10,16 +9,10 @@ namespace fs = std::filesystem;
 class SequentialImageProcessor {
 private:
   std::vector<std::string> dicomFiles;
-  std::string basePath;
-  std::string outputPath;
-
-  // Timing measurements
-  std::chrono::duration<double> importTime{0};
-  std::chrono::duration<double> preprocessTime{0};
-  std::chrono::duration<double> segmentationTime{0};
-  std::chrono::duration<double> postprocessTime{0};
-  std::chrono::duration<double> exportTime{0};
-  std::chrono::duration<double> totalTime{0};
+  std::string baseDataPath;
+  std::string patientPath;
+  std::string outputBasePath;
+  std::string currentOutputPath;
 
   // Helper function to extract number from filename for sorting
   int extractFileNumber(const std::string &filename) {
@@ -35,31 +28,21 @@ private:
     }
     return 1000;
   }
-  void setupOutputDirectory() {
+
+  void setupOutputDirectory(const std::string &patientID) {
     try {
-      if (system(("mkdir -p " + outputPath + " && cd " + outputPath +
-                  " && rm -rf *")
+      currentOutputPath = outputBasePath + "/" + patientID;
+      if (system(("mkdir -p " + currentOutputPath + " && cd " +
+                  currentOutputPath + " && rm -rf *")
                      .c_str()) != 0) {
         throw std::runtime_error("Failed to setup output directory: " +
-                                 outputPath);
+                                 currentOutputPath);
       }
-      std::cout << "Created clean output directory: " + outputPath << std::endl;
+      std::cout << "Created clean output directory: " + currentOutputPath
+                << std::endl;
     } catch (const std::exception &e) {
       throw std::runtime_error("Error setting up output directory: " +
                                std::string(e.what()));
-    }
-  }
-  void verifyProcessingStep(std::shared_ptr<ProcessObject> process,
-                            const std::string &stepName) {
-    try {
-      process->update();
-      auto output = process->getOutputData<Image>(0);
-      if (!output) {
-        throw Exception("No output data produced at " + stepName);
-      }
-    } catch (Exception &e) {
-      std::cerr << "Error at " << stepName << ": " << e.what() << std::endl;
-      throw;
     }
   }
 
@@ -75,8 +58,8 @@ private:
       renderToImage->removeAllRenderers();
       renderToImage->connect(originalRenderer);
       renderToImage->update();
-      auto exporter = ImageFileExporter::create(outputPath + "/" + baseName +
-                                                "_original.jpg");
+      auto exporter = ImageFileExporter::create(currentOutputPath + "/" +
+                                                baseName + "_original.jpg");
       exporter->connect(renderToImage->getOutputData<Image>(0));
       exporter->update();
 
@@ -84,7 +67,7 @@ private:
       renderToImage->removeAllRenderers();
       renderToImage->connect(dilationRenderer);
       renderToImage->update();
-      exporter = ImageFileExporter::create(outputPath + "/" + baseName +
+      exporter = ImageFileExporter::create(currentOutputPath + "/" + baseName +
                                            "_processed.jpg");
       exporter->connect(renderToImage->getOutputData<Image>(0));
       exporter->update();
@@ -96,20 +79,69 @@ private:
 
 public:
   SequentialImageProcessor(const std::string &outputDir = "../out-sequential")
-      : outputPath(outputDir) {
-    basePath = Config::getTestDataPath() +
-               "Brain-Tumor-Progression/PGBM-017/09-17-1997-RA FH MR RCBV "
-               "OP-85753/16.000000-T1post-19554/";
+      : outputBasePath(outputDir) {
+    baseDataPath = Config::getTestDataPath() +
+                   "Brain-Tumor-Progression/T1-Post-Combined-P001-P020/";
 
-    setupOutputDirectory();
-    loadDICOMFiles();
+    // Create main output directory
+    if (system(("mkdir -p " + outputBasePath).c_str()) != 0) {
+      throw std::runtime_error("Failed to create base output directory: " +
+                               outputBasePath);
+    }
   }
 
-  void loadDICOMFiles() {
+  std::vector<std::string> findAllPatientDirectories() {
+    std::vector<std::string> patientDirs;
+
     try {
+      for (const auto &entry : fs::directory_iterator(baseDataPath)) {
+        if (entry.is_directory()) {
+          std::string dirName = entry.path().filename().string();
+          // Check if it's a patient directory (starts with "PGBM-")
+          if (dirName.find("PGBM-") == 0) {
+            patientDirs.push_back(dirName);
+          }
+        }
+      }
+
+      // Sort patient directories
+      std::sort(patientDirs.begin(), patientDirs.end());
+
+      std::cout << "Found " << patientDirs.size() << " patient directories."
+                << std::endl;
+    } catch (const std::exception &e) {
+      std::cerr << "Error finding patient directories: " << e.what()
+                << std::endl;
+      throw;
+    }
+
+    return patientDirs;
+  }
+
+  void loadDICOMFilesForPatient(const std::string &patientID) {
+    try {
+      // First find all subdirectories in the patient folder
+      patientPath = baseDataPath + patientID + "/";
+      std::vector<std::string> seriesDirs;
+
+      for (const auto &entry : fs::directory_iterator(patientPath)) {
+        if (entry.is_directory()) {
+          seriesDirs.push_back(entry.path().string() + "/");
+        }
+      }
+
+      if (seriesDirs.empty()) {
+        throw std::runtime_error("No series directories found for patient: " +
+                                 patientID);
+      }
+
+      // Use the first series directory found (usually there's only one)
+      std::string seriesPath = seriesDirs[0];
+      std::cout << "Using series directory: " << seriesPath << std::endl;
+
       std::vector<std::pair<std::string, int>> fileNumberPairs;
 
-      for (const auto &entry : fs::directory_iterator(basePath)) {
+      for (const auto &entry : fs::directory_iterator(seriesPath)) {
         if (entry.path().extension() == ".dcm") {
           std::string filepath = entry.path().string();
           int fileNumber = extractFileNumber(entry.path().filename().string());
@@ -126,95 +158,100 @@ public:
         dicomFiles.push_back(pair.first);
       }
 
-      std::cout << "Found " << dicomFiles.size()
-                << " DICOM files in: " << basePath << std::endl;
+      std::cout << "Found " << dicomFiles.size() << " DICOM files for patient "
+                << patientID << std::endl;
     } catch (const std::exception &e) {
-      std::cerr << "Error loading DICOM files: " << e.what() << std::endl;
+      std::cerr << "Error loading DICOM files for patient " << patientID << ": "
+                << e.what() << std::endl;
       throw;
     }
   }
 
   void processSingleImage(const std::string &filename) {
-    auto startTotal = std::chrono::high_resolution_clock::now();
-
     try {
       std::cout << "Processing: " << fs::path(filename).filename() << std::endl;
 
       // Import Stage
-      auto startImport = std::chrono::high_resolution_clock::now();
       auto importer = DICOMFileImporter::create(filename);
       importer->setLoadSeries(false);
-      verifyProcessingStep(importer, "Import Stage");
-      importTime += std::chrono::high_resolution_clock::now() - startImport;
+      importer->update();
+
+      // Get image dimensions to adjust seed points accordingly
+      auto importedImage = importer->getOutputData<Image>(0);
+      if (!importedImage) {
+        throw Exception("Failed to get imported image");
+      }
+
+      int width = importedImage->getWidth();
+      int height = importedImage->getHeight();
+
+      // Safety check for minimum dimensions
+      if (width < 100 || height < 100) {
+        throw Exception("Image dimensions too small: " + std::to_string(width) +
+                        "x" + std::to_string(height));
+      }
 
       // Preprocessing Stage
-      auto startPreprocess = std::chrono::high_resolution_clock::now();
-
       auto normalize =
           IntensityNormalization::create(0.5f, 2.5f, 0.0f, 10000.0f);
       normalize->connect(importer);
-      verifyProcessingStep(normalize, "Normalization");
+      normalize->update();
 
       auto clipping = IntensityClipping::create(0.68f, 4000.0f);
       clipping->connect(normalize);
-      verifyProcessingStep(clipping, "Clipping");
+      clipping->update();
 
-      auto medianfilter = VectorMedianFilter::create(5);
+      auto medianfilter = VectorMedianFilter::create(7);
       medianfilter->connect(clipping);
-      verifyProcessingStep(medianfilter, "Median Filter");
+      medianfilter->update();
 
       auto sharpen = ImageSharpening::create(2.0f, 0.5f, 9);
       sharpen->connect(medianfilter);
-      verifyProcessingStep(sharpen, "Sharpening");
-
-      preprocessTime +=
-          std::chrono::high_resolution_clock::now() - startPreprocess;
+      sharpen->update();
 
       // Segmentation Stage
-      auto startSegmentation = std::chrono::high_resolution_clock::now();
+      // Calculate center and adjust seed points based on image dimensions
+      int centerX = width / 2;
+      int centerY = height / 2;
+
+      // Create seed points relative to center
+      std::vector<Vector3i> seedPoints;
+
+      // Add central seed point
+      seedPoints.push_back(Vector3i(centerX, centerY, 0));
+
+      // Add seed points around center
+      int offsetX = width / 8;
+      int offsetY = height / 8;
+
+      seedPoints.push_back(Vector3i(centerX + offsetX, centerY, 0));
+      seedPoints.push_back(Vector3i(centerX - offsetX, centerY, 0));
+      seedPoints.push_back(Vector3i(centerX, centerY + offsetY, 0));
+      seedPoints.push_back(Vector3i(centerX, centerY - offsetY, 0));
 
       auto regionGrowing =
-          SeededRegionGrowing::create(0.74f, 0.91f,
-                                      std::vector<Vector3i>{{300, 256, 0},
-                                                            {320, 256, 0},
-                                                            {340, 256, 0},
-                                                            {300, 236, 0},
-                                                            {300, 276, 0},
-                                                            {212, 256, 0},
-                                                            {192, 256, 0},
-                                                            {172, 256, 0},
-                                                            {212, 236, 0},
-                                                            {212, 276, 0}});
+          SeededRegionGrowing::create(0.74f, 0.91f, seedPoints);
       regionGrowing->connect(sharpen);
-      // Add additional seed points in a grid pattern
 
-      for (int x = 150; x < 362; x += 30) {
-        for (int y = 150; y < 362; y += 30) {
+      // Add additional seed points in a grid pattern
+      for (int x = width / 4; x < width * 3 / 4; x += width / 10) {
+        for (int y = height / 4; y < height * 3 / 4; y += height / 10) {
           regionGrowing->addSeedPoint(x, y);
         }
       }
-      verifyProcessingStep(regionGrowing, "Region Growing");
 
-      segmentationTime +=
-          std::chrono::high_resolution_clock::now() - startSegmentation;
+      regionGrowing->update();
 
       // Post-processing Stage
-      auto startPostprocess = std::chrono::high_resolution_clock::now();
-
       auto caster = ImageCaster::create(TYPE_UINT8);
       caster->connect(regionGrowing);
-      verifyProcessingStep(caster, "Type Casting");
+      caster->update();
 
       auto dilation = Dilation::create(3);
       dilation->connect(caster);
-      verifyProcessingStep(dilation, "Dilation");
-
-      postprocessTime +=
-          std::chrono::high_resolution_clock::now() - startPostprocess;
+      dilation->update();
 
       // Export Stage
-      auto startExport = std::chrono::high_resolution_clock::now();
-
       LabelColors labelColors;
       labelColors[1] = Color::White();
 
@@ -227,18 +264,48 @@ public:
       exportProcessedImage(filename, renderToImage, originalRenderer,
                            dilationRenderer);
 
-      exportTime += std::chrono::high_resolution_clock::now() - startExport;
-
     } catch (Exception &e) {
       std::cerr << "Error processing file " << filename << ":\n"
                 << "Detailed error: " << e.what() << std::endl;
       // Don't throw here - allow processing of other images to continue
     }
-
-    totalTime += std::chrono::high_resolution_clock::now() - startTotal;
   }
 
-  void processAllImages() {
+  void processPatient(const std::string &patientID) {
+    try {
+      std::cout << "\n=== Processing Patient: " << patientID << " ===\n"
+                << std::endl;
+
+      // Setup output directory for this patient
+      setupOutputDirectory(patientID);
+
+      // Load DICOM files for this patient
+      loadDICOMFilesForPatient(patientID);
+
+      // Process each image
+      int successCount = 0;
+      for (size_t i = 0; i < dicomFiles.size(); ++i) {
+        try {
+          processSingleImage(dicomFiles[i]);
+          successCount++;
+        } catch (const std::exception &e) {
+          std::cerr << "Failed to process image " << (i + 1) << " for patient "
+                    << patientID << ". Moving to next image." << std::endl;
+        }
+      }
+
+      std::cout << "\nPatient " << patientID
+                << " completed. Successfully processed " << successCount << "/"
+                << dicomFiles.size() << " images." << std::endl;
+
+    } catch (const std::exception &e) {
+      std::cerr << "Error processing patient " << patientID << ": " << e.what()
+                << std::endl;
+      // Don't throw here - allow processing of other patients to continue
+    }
+  }
+
+  void processAllPatients() {
     // Set reporting method for different types of messages
     Reporter::setGlobalReportMethod(Reporter::INFO,
                                     Reporter::NONE); // Disable INFO messages
@@ -247,44 +314,32 @@ public:
     Reporter::setGlobalReportMethod(Reporter::ERROR,
                                     Reporter::COUT); // Keep errors to console
 
-    std::cout << "\n=== Starting Sequential Processing ===\n" << std::endl;
-    std::cout << "Found " << dicomFiles.size() << " images to process"
+    std::cout << "\n=== Starting Sequential Processing for All Patients ===\n"
               << std::endl;
 
-    int successCount = 0;
-    for (size_t i = 0; i < dicomFiles.size(); ++i) {
+    // Find all patient directories
+    std::vector<std::string> patientDirs = findAllPatientDirectories();
+
+    if (patientDirs.empty()) {
+      std::cout << "No patient directories found. Exiting." << std::endl;
+      return;
+    }
+
+    // Process each patient directory
+    int successfulPatients = 0;
+    for (const auto &patientID : patientDirs) {
       try {
-        processSingleImage(dicomFiles[i]);
-        successCount++;
+        processPatient(patientID);
+        successfulPatients++;
       } catch (const std::exception &e) {
-        std::cerr << "Failed to process image " << (i + 1)
-                  << ". Moving to next image." << std::endl;
+        std::cerr << "Failed to process patient " << patientID
+                  << ". Moving to next patient." << std::endl;
       }
     }
 
-    std::cout << "\nProcessing completed. Successfully processed "
-              << successCount << "/" << dicomFiles.size() << " images."
-              << std::endl;
-
-    printTimingResults();
-  }
-
-  void printTimingResults() const {
-    std::cout << "\n=== Processing Time Results ===\n" << std::endl;
-    std::cout << "Import Time: " << importTime.count() << " seconds"
-              << std::endl;
-    std::cout << "Preprocessing Time: " << preprocessTime.count() << " seconds"
-              << std::endl;
-    std::cout << "Segmentation Time: " << segmentationTime.count() << " seconds"
-              << std::endl;
-    std::cout << "Post-processing Time: " << postprocessTime.count()
-              << " seconds" << std::endl;
-    std::cout << "Export Time: " << exportTime.count() << " seconds"
-              << std::endl;
-    std::cout << "Total Time: " << totalTime.count() << " seconds" << std::endl;
-    std::cout << "Average Time per Image: "
-              << totalTime.count() / dicomFiles.size() << " seconds"
-              << std::endl;
+    std::cout << "\n=== All Processing Completed ===\n" << std::endl;
+    std::cout << "Successfully processed " << successfulPatients << "/"
+              << patientDirs.size() << " patients." << std::endl;
   }
 };
 
@@ -299,7 +354,7 @@ int main() {
                                     Reporter::COUT); // Keep errors to console
 
     SequentialImageProcessor processor;
-    processor.processAllImages();
+    processor.processAllPatients();
   } catch (const std::exception &e) {
     std::cerr << "Fatal error: " << e.what() << std::endl;
     return 1;

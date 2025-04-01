@@ -42,6 +42,10 @@ data/
 dataset/
 BRATS/
 
+# JSON files
+parallel_results.json
+sequential_results.json
+
 # System files
 .DS_Store
 Thumbs.db
