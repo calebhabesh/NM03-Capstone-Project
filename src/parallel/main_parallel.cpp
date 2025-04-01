@@ -1,4 +1,4 @@
-#include "FAST/includes.hpp"
+#include "FAST/FAST_directives.hpp"
 #include <atomic>
 #include <filesystem>
 #include <iostream>
@@ -19,13 +19,15 @@ struct ProcessedImageData {
 class OptimizedParallelProcessor {
 private:
   std::vector<std::string> dicomFiles;
-  std::string basePath;
-  std::string outputPath;
+  std::string baseDataPath;
+  std::string patientPath;
+  std::string outputBasePath;
+  std::string currentOutputPath;
   std::mutex outputMutex;
   std::shared_ptr<RenderToImage> renderToImage;
   std::atomic<size_t> completedImages{0};
   const size_t PROGRESS_REPORT_INTERVAL = 5;
-  static const size_t DEFAULT_BATCH_SIZE = 16;
+  static const size_t DEFAULT_BATCH_SIZE = 20;
 
   int extractFileNumber(const std::string &filename) {
     size_t dashPos = filename.find_last_of('-');
@@ -41,15 +43,17 @@ private:
     return 1000;
   }
 
-  void setupOutputDirectory() {
+  void setupOutputDirectory(const std::string &patientID) {
     try {
-      if (system(("mkdir -p " + outputPath + " && cd " + outputPath +
-                  " && rm -rf *")
+      currentOutputPath = outputBasePath + "/" + patientID;
+      if (system(("mkdir -p " + currentOutputPath + " && cd " +
+                  currentOutputPath + " && rm -rf *")
                      .c_str()) != 0) {
         throw std::runtime_error("Failed to setup output directory: " +
-                                 outputPath);
+                                 currentOutputPath);
       }
-      std::cout << "Created output directory: " + outputPath << std::endl;
+      std::cout << "Created output directory: " + currentOutputPath
+                << std::endl;
     } catch (const std::exception &e) {
       throw std::runtime_error("Error setting up output directory: " +
                                std::string(e.what()));
@@ -184,7 +188,7 @@ private:
           renderToImage->connect(originalRenderer);
           renderToImage->update();
 
-          auto exporter = ImageFileExporter::create(outputPath + "/" +
+          auto exporter = ImageFileExporter::create(currentOutputPath + "/" +
                                                     baseName + "_original.jpg");
           exporter->connect(renderToImage->getOutputData<Image>(0));
           exporter->update();
@@ -200,7 +204,7 @@ private:
           renderToImage->update();
 
           auto exporter = ImageFileExporter::create(
-              outputPath + "/" + baseName + "_processed.jpg");
+              currentOutputPath + "/" + baseName + "_processed.jpg");
           exporter->connect(renderToImage->getOutputData<Image>(0));
           exporter->update();
         }
@@ -212,21 +216,71 @@ private:
 
 public:
   OptimizedParallelProcessor(const std::string &outputDir = "../out-parallel")
-      : outputPath(outputDir) {
-    basePath = Config::getTestDataPath() +
-               "Brain-Tumor-Progression/T1-Post-Combined-P001-P020/PGBM-017/"
-               "16.000000-T1post-19554/";
+      : outputBasePath(outputDir) {
+    baseDataPath = Config::getTestDataPath() +
+                   "Brain-Tumor-Progression/T1-Post-Combined-P001-P020/";
 
-    setupOutputDirectory();
-    loadDICOMFiles();
+    // Create main output directory
+    if (system(("mkdir -p " + outputBasePath).c_str()) != 0) {
+      throw std::runtime_error("Failed to create base output directory: " +
+                               outputBasePath);
+    }
+
     renderToImage = RenderToImage::create(Color::Black(), 512, 512);
   }
 
-  void loadDICOMFiles() {
+  std::vector<std::string> findAllPatientDirectories() {
+    std::vector<std::string> patientDirs;
+
     try {
+      for (const auto &entry : fs::directory_iterator(baseDataPath)) {
+        if (entry.is_directory()) {
+          std::string dirName = entry.path().filename().string();
+          // Check if it's a patient directory (starts with "PGBM-")
+          if (dirName.find("PGBM-") == 0) {
+            patientDirs.push_back(dirName);
+          }
+        }
+      }
+
+      // Sort patient directories
+      std::sort(patientDirs.begin(), patientDirs.end());
+
+      std::cout << "Found " << patientDirs.size() << " patient directories."
+                << std::endl;
+    } catch (const std::exception &e) {
+      std::cerr << "Error finding patient directories: " << e.what()
+                << std::endl;
+      throw;
+    }
+
+    return patientDirs;
+  }
+
+  void loadDICOMFilesForPatient(const std::string &patientID) {
+    try {
+      // First find all subdirectories in the patient folder
+      patientPath = baseDataPath + patientID + "/";
+      std::vector<std::string> seriesDirs;
+
+      for (const auto &entry : fs::directory_iterator(patientPath)) {
+        if (entry.is_directory()) {
+          seriesDirs.push_back(entry.path().string() + "/");
+        }
+      }
+
+      if (seriesDirs.empty()) {
+        throw std::runtime_error("No series directories found for patient: " +
+                                 patientID);
+      }
+
+      // Use the first series directory found (usually there's only one)
+      std::string seriesPath = seriesDirs[0];
+      std::cout << "Using series directory: " << seriesPath << std::endl;
+
       std::vector<std::pair<std::string, int>> fileNumberPairs;
 
-      for (const auto &entry : fs::directory_iterator(basePath)) {
+      for (const auto &entry : fs::directory_iterator(seriesPath)) {
         if (entry.path().extension() == ".dcm") {
           std::string filepath = entry.path().string();
           int fileNumber = extractFileNumber(entry.path().filename().string());
@@ -243,45 +297,91 @@ public:
         dicomFiles.push_back(pair.first);
       }
 
-      std::cout << "Found " << dicomFiles.size()
-                << " DICOM files in: " << basePath << std::endl;
+      std::cout << "Found " << dicomFiles.size() << " DICOM files for patient "
+                << patientID << std::endl;
     } catch (const std::exception &e) {
-      std::cerr << "Error loading DICOM files: " << e.what() << std::endl;
+      std::cerr << "Error loading DICOM files for patient " << patientID << ": "
+                << e.what() << std::endl;
       throw;
     }
   }
 
-  void processAllImages(size_t batchSize = DEFAULT_BATCH_SIZE) {
-    std::cout << "\n=== Starting Parallel Processing ===\n" << std::endl;
-    std::cout << "Found " << dicomFiles.size() << " images to process"
-              << std::endl;
-    std::cout << "Using " << omp_get_max_threads() << " threads\n" << std::endl;
+  void processPatient(const std::string &patientID,
+                      size_t batchSize = DEFAULT_BATCH_SIZE) {
+    try {
+      std::cout << "\n=== Processing Patient: " << patientID
+                << " using Parallel Processing ===\n"
+                << std::endl;
 
-    int successCount = 0;
+      // Setup output directory for this patient
+      setupOutputDirectory(patientID);
 
-    // Process images in batches
-    for (size_t batchStart = 0; batchStart < dicomFiles.size();
-         batchStart += batchSize) {
-      size_t currentBatchSize =
-          std::min(batchSize, dicomFiles.size() - batchStart);
-      std::vector<ProcessedImageData> batchResults(currentBatchSize);
+      // Load DICOM files for this patient
+      loadDICOMFilesForPatient(patientID);
 
-#pragma omp parallel for schedule(static) reduction(+ : successCount)
-      for (size_t i = 0; i < currentBatchSize; ++i) {
-        size_t fileIndex = batchStart + i;
-        batchResults[i] = processSingleImage(dicomFiles[fileIndex]);
-        if (batchResults[i].originalImage && batchResults[i].processedImage) {
-          successCount++;
+      int successCount = 0;
+      std::cout << "Found " << dicomFiles.size()
+                << " images to process for patient " << patientID << std::endl;
+      std::cout << "Using " << omp_get_max_threads() << " threads\n"
+                << std::endl;
+
+      // Process images in batches
+      for (size_t batchStart = 0; batchStart < dicomFiles.size();
+           batchStart += batchSize) {
+        size_t currentBatchSize =
+            std::min(batchSize, dicomFiles.size() - batchStart);
+        std::vector<ProcessedImageData> batchResults(currentBatchSize);
+
+#pragma omp parallel for schedule(guided) reduction(+ : successCount)
+        for (size_t i = 0; i < currentBatchSize; ++i) {
+          size_t fileIndex = batchStart + i;
+          batchResults[i] = processSingleImage(dicomFiles[fileIndex]);
+          if (batchResults[i].originalImage && batchResults[i].processedImage) {
+            successCount++;
+          }
         }
+
+        // Export batch results
+        exportBatch(batchResults);
       }
 
-      // Export batch results
-      exportBatch(batchResults);
+      std::cout << "\nPatient " << patientID
+                << " completed. Successfully processed " << successCount << "/"
+                << dicomFiles.size() << " images." << std::endl;
+    } catch (const std::exception &e) {
+      std::cerr << "Error processing patient " << patientID << ": " << e.what()
+                << std::endl;
+      // Don't throw here - allow processing of other patients to continue
+    }
+  }
+
+  void processAllPatients(size_t batchSize = DEFAULT_BATCH_SIZE) {
+    std::cout << "\n=== Starting Parallel Processing for All Patients ===\n"
+              << std::endl;
+
+    // Find all patient directories
+    std::vector<std::string> patientDirs = findAllPatientDirectories();
+
+    if (patientDirs.empty()) {
+      std::cout << "No patient directories found. Exiting." << std::endl;
+      return;
     }
 
-    std::cout << "\nProcessing completed. Successfully processed "
-              << successCount << "/" << dicomFiles.size() << " images."
-              << std::endl;
+    // Process each patient directory
+    int successfulPatients = 0;
+    for (const auto &patientID : patientDirs) {
+      try {
+        processPatient(patientID, batchSize);
+        successfulPatients++;
+      } catch (const std::exception &e) {
+        std::cerr << "Failed to process patient " << patientID
+                  << ". Moving to next patient." << std::endl;
+      }
+    }
+
+    std::cout << "\n=== All Processing Completed ===\n" << std::endl;
+    std::cout << "Successfully processed " << successfulPatients << "/"
+              << patientDirs.size() << " patients." << std::endl;
   }
 };
 
@@ -298,12 +398,11 @@ int main(int argc, char *argv[]) {
                                     Reporter::COUT); // Keep errors to console
 
     omp_set_num_threads(16);
-
     omp_set_nested(1);
     omp_set_max_active_levels(2);
 
     OptimizedParallelProcessor processor;
-    processor.processAllImages();
+    processor.processAllPatients();
 
   } catch (const std::exception &e) {
     std::cerr << "Fatal error: " << e.what() << std::endl;

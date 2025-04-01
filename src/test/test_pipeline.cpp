@@ -1,6 +1,4 @@
-// Add modules from includes.hpp
-#include "FAST/includes.hpp"
-
+#include "FAST/FAST_directives.hpp"
 #include <sys/types.h>
 
 using namespace fast;

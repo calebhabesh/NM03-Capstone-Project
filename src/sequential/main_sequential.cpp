@@ -1,4 +1,4 @@
-#include "FAST/includes.hpp"
+#include "FAST/FAST_directives.hpp"
 #include <filesystem>
 #include <iostream>
 #include <vector>
@@ -9,8 +9,10 @@ namespace fs = std::filesystem;
 class SequentialImageProcessor {
 private:
   std::vector<std::string> dicomFiles;
-  std::string basePath;
-  std::string outputPath;
+  std::string baseDataPath;
+  std::string patientPath;
+  std::string outputBasePath;
+  std::string currentOutputPath;
 
   // Helper function to extract number from filename for sorting
   int extractFileNumber(const std::string &filename) {
@@ -27,15 +29,17 @@ private:
     return 1000;
   }
 
-  void setupOutputDirectory() {
+  void setupOutputDirectory(const std::string &patientID) {
     try {
-      if (system(("mkdir -p " + outputPath + " && cd " + outputPath +
-                  " && rm -rf *")
+      currentOutputPath = outputBasePath + "/" + patientID;
+      if (system(("mkdir -p " + currentOutputPath + " && cd " +
+                  currentOutputPath + " && rm -rf *")
                      .c_str()) != 0) {
         throw std::runtime_error("Failed to setup output directory: " +
-                                 outputPath);
+                                 currentOutputPath);
       }
-      std::cout << "Created clean output directory: " + outputPath << std::endl;
+      std::cout << "Created clean output directory: " + currentOutputPath
+                << std::endl;
     } catch (const std::exception &e) {
       throw std::runtime_error("Error setting up output directory: " +
                                std::string(e.what()));
@@ -54,8 +58,8 @@ private:
       renderToImage->removeAllRenderers();
       renderToImage->connect(originalRenderer);
       renderToImage->update();
-      auto exporter = ImageFileExporter::create(outputPath + "/" + baseName +
-                                                "_original.jpg");
+      auto exporter = ImageFileExporter::create(currentOutputPath + "/" +
+                                                baseName + "_original.jpg");
       exporter->connect(renderToImage->getOutputData<Image>(0));
       exporter->update();
 
@@ -63,7 +67,7 @@ private:
       renderToImage->removeAllRenderers();
       renderToImage->connect(dilationRenderer);
       renderToImage->update();
-      exporter = ImageFileExporter::create(outputPath + "/" + baseName +
+      exporter = ImageFileExporter::create(currentOutputPath + "/" + baseName +
                                            "_processed.jpg");
       exporter->connect(renderToImage->getOutputData<Image>(0));
       exporter->update();
@@ -75,20 +79,69 @@ private:
 
 public:
   SequentialImageProcessor(const std::string &outputDir = "../out-sequential")
-      : outputPath(outputDir) {
-    basePath = Config::getTestDataPath() +
-               "Brain-Tumor-Progression/T1-Post-Combined-P001-P020/PGBM-017/"
-               "16.000000-T1post-19554/";
+      : outputBasePath(outputDir) {
+    baseDataPath = Config::getTestDataPath() +
+                   "Brain-Tumor-Progression/T1-Post-Combined-P001-P020/";
 
-    setupOutputDirectory();
-    loadDICOMFiles();
+    // Create main output directory
+    if (system(("mkdir -p " + outputBasePath).c_str()) != 0) {
+      throw std::runtime_error("Failed to create base output directory: " +
+                               outputBasePath);
+    }
   }
 
-  void loadDICOMFiles() {
+  std::vector<std::string> findAllPatientDirectories() {
+    std::vector<std::string> patientDirs;
+
     try {
+      for (const auto &entry : fs::directory_iterator(baseDataPath)) {
+        if (entry.is_directory()) {
+          std::string dirName = entry.path().filename().string();
+          // Check if it's a patient directory (starts with "PGBM-")
+          if (dirName.find("PGBM-") == 0) {
+            patientDirs.push_back(dirName);
+          }
+        }
+      }
+
+      // Sort patient directories
+      std::sort(patientDirs.begin(), patientDirs.end());
+
+      std::cout << "Found " << patientDirs.size() << " patient directories."
+                << std::endl;
+    } catch (const std::exception &e) {
+      std::cerr << "Error finding patient directories: " << e.what()
+                << std::endl;
+      throw;
+    }
+
+    return patientDirs;
+  }
+
+  void loadDICOMFilesForPatient(const std::string &patientID) {
+    try {
+      // First find all subdirectories in the patient folder
+      patientPath = baseDataPath + patientID + "/";
+      std::vector<std::string> seriesDirs;
+
+      for (const auto &entry : fs::directory_iterator(patientPath)) {
+        if (entry.is_directory()) {
+          seriesDirs.push_back(entry.path().string() + "/");
+        }
+      }
+
+      if (seriesDirs.empty()) {
+        throw std::runtime_error("No series directories found for patient: " +
+                                 patientID);
+      }
+
+      // Use the first series directory found (usually there's only one)
+      std::string seriesPath = seriesDirs[0];
+      std::cout << "Using series directory: " << seriesPath << std::endl;
+
       std::vector<std::pair<std::string, int>> fileNumberPairs;
 
-      for (const auto &entry : fs::directory_iterator(basePath)) {
+      for (const auto &entry : fs::directory_iterator(seriesPath)) {
         if (entry.path().extension() == ".dcm") {
           std::string filepath = entry.path().string();
           int fileNumber = extractFileNumber(entry.path().filename().string());
@@ -105,10 +158,11 @@ public:
         dicomFiles.push_back(pair.first);
       }
 
-      std::cout << "Found " << dicomFiles.size()
-                << " DICOM files in: " << basePath << std::endl;
+      std::cout << "Found " << dicomFiles.size() << " DICOM files for patient "
+                << patientID << std::endl;
     } catch (const std::exception &e) {
-      std::cerr << "Error loading DICOM files: " << e.what() << std::endl;
+      std::cerr << "Error loading DICOM files for patient " << patientID << ": "
+                << e.what() << std::endl;
       throw;
     }
   }
@@ -217,7 +271,41 @@ public:
     }
   }
 
-  void processAllImages() {
+  void processPatient(const std::string &patientID) {
+    try {
+      std::cout << "\n=== Processing Patient: " << patientID << " ===\n"
+                << std::endl;
+
+      // Setup output directory for this patient
+      setupOutputDirectory(patientID);
+
+      // Load DICOM files for this patient
+      loadDICOMFilesForPatient(patientID);
+
+      // Process each image
+      int successCount = 0;
+      for (size_t i = 0; i < dicomFiles.size(); ++i) {
+        try {
+          processSingleImage(dicomFiles[i]);
+          successCount++;
+        } catch (const std::exception &e) {
+          std::cerr << "Failed to process image " << (i + 1) << " for patient "
+                    << patientID << ". Moving to next image." << std::endl;
+        }
+      }
+
+      std::cout << "\nPatient " << patientID
+                << " completed. Successfully processed " << successCount << "/"
+                << dicomFiles.size() << " images." << std::endl;
+
+    } catch (const std::exception &e) {
+      std::cerr << "Error processing patient " << patientID << ": " << e.what()
+                << std::endl;
+      // Don't throw here - allow processing of other patients to continue
+    }
+  }
+
+  void processAllPatients() {
     // Set reporting method for different types of messages
     Reporter::setGlobalReportMethod(Reporter::INFO,
                                     Reporter::NONE); // Disable INFO messages
@@ -226,24 +314,32 @@ public:
     Reporter::setGlobalReportMethod(Reporter::ERROR,
                                     Reporter::COUT); // Keep errors to console
 
-    std::cout << "\n=== Starting Sequential Processing ===\n" << std::endl;
-    std::cout << "Found " << dicomFiles.size() << " images to process"
+    std::cout << "\n=== Starting Sequential Processing for All Patients ===\n"
               << std::endl;
 
-    int successCount = 0;
-    for (size_t i = 0; i < dicomFiles.size(); ++i) {
+    // Find all patient directories
+    std::vector<std::string> patientDirs = findAllPatientDirectories();
+
+    if (patientDirs.empty()) {
+      std::cout << "No patient directories found. Exiting." << std::endl;
+      return;
+    }
+
+    // Process each patient directory
+    int successfulPatients = 0;
+    for (const auto &patientID : patientDirs) {
       try {
-        processSingleImage(dicomFiles[i]);
-        successCount++;
+        processPatient(patientID);
+        successfulPatients++;
       } catch (const std::exception &e) {
-        std::cerr << "Failed to process image " << (i + 1)
-                  << ". Moving to next image." << std::endl;
+        std::cerr << "Failed to process patient " << patientID
+                  << ". Moving to next patient." << std::endl;
       }
     }
 
-    std::cout << "\nProcessing completed. Successfully processed "
-              << successCount << "/" << dicomFiles.size() << " images."
-              << std::endl;
+    std::cout << "\n=== All Processing Completed ===\n" << std::endl;
+    std::cout << "Successfully processed " << successfulPatients << "/"
+              << patientDirs.size() << " patients." << std::endl;
   }
 };
 
@@ -258,7 +354,7 @@ int main() {
                                     Reporter::COUT); // Keep errors to console
 
     SequentialImageProcessor processor;
-    processor.processAllImages();
+    processor.processAllPatients();
   } catch (const std::exception &e) {
     std::cerr << "Fatal error: " << e.what() << std::endl;
     return 1;
