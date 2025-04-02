@@ -1,12 +1,23 @@
 # Parallelizing Brain Image Processing using the FAST Framework and OpenMP
 
-A parallel computing system to make brain imaging processing more efficient using [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization). This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging processing tasks.
+A parallel computing system to make brain imaging processing more efficient using [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization) and [OpenMP](https://www.openmp.org/wp-content/uploads/OpenMP-RefGuide-6.0-OMP60SC24-web.pdf). This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging processing tasks.
 
-This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a further parallelized version (since FAST already provides some level of heterogeneous compute in their filtering/segmentation algorithms). The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
+This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a **further parallelized version (since FAST already provides some level of heterogeneous compute in their filtering/segmentation algorithms).** The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
+
+The pipeline involves several stages:
+
+1. **Import:** Loading DICOM files.
+2. **Preprocessing:** Applying Intensity Normalization, Intensity Clipping, Vector Median Filtering, and Image Sharpening.
+3. **Segmentation:** Using Seeded Region Growing with adaptive seed points based on image dimensions.
+4. **Post-processing:** Casting image types and applying morphological operations like Dilation (and Erosion in the test pipeline).
+5. **Export:** Saving the original and processed images as JPEGs.
 
 ### Initial Medical Imaging Processing Pipeline
+
 ![image](https://github.com/user-attachments/assets/6e9675cf-eccb-4523-985c-341763ced9fc)
+
 ### Revised Medical Imaging Processing Pipeline
+
 ![image](https://github.com/user-attachments/assets/85b27a61-17f8-46a0-b030-c0a6bbc28407)
 
 ## Prerequisites
@@ -18,54 +29,71 @@ This requires first implementing a sequential implementation of an image process
 - FAST Framework (installed on system)
 - Git
 
-## Building the Project
+## Building the Project & Running Test Pipeline
 
 ```bash
 mkdir build
 cd build
-cmake .. -DFAST_DIR=/opt/fast/cmake/ # default installation location, varies if built from source
-cmake --build . --config Release
-# Run Executable (test pipeline example)
+cmake .. -DFAST_DIR=/opt/fast/cmake/ # default installation location, specify if otherwise
+make
+# Run test pipeline binary
 ./test_pipeline 
+# other binaries include: ./img_processing_sequential or ./img_processing_parallel
 ```
 
 ## Project Structure
 
-After building the target executables, the project root directory will resemble the following:
+After building the target executables, and running their binaries the project root directory will resemble the following:
 
 ```
 ./
 ├── src/
-├── build/
-├── CMakeLists.txt
-├── out-parallel/ # exported images (to .jpg) after running ./img_processing_parallel
-├── out-sequential/ # exported images (to .jpg) after running ./img_processing_sequential 
-├── out-test/ # exported images (to .jpg) after running ./test-pipeline
-└── README.md
+│   ├── include/      # Header files (e.g., FAST directives)
+│   ├── parallel/     # Parallel implementation source (main_parallel.cpp)
+│   ├── sequential/   # Sequential implementation source (main_sequential.cpp)
+│   └── test/         # Test pipeline source (test_pipeline.cpp)
+├── build/            # Build directory
+├── CMakeLists.txt    # CMake build config
+├── out-parallel/     # Output from parallel processing (contains subdirectories per patient)
+│   └── PGBM-XXXX/    # Example patient output directory
+│       ├── *.jpg     # Original and processed image pair
+├── out-sequential/   # Output from sequential processing (contains subdirectories per patient)
+│   └── PGBM-XXXX/    # Example patient output directory
+│       ├── *.jpg     # Original and processed image pair
+├── out-test/         # Output images from the test pipeline
+└── README.md         # This file
 ```
 
 ### Test Pipeline
 
-**Implemented in /src/test/test-pipeline.cpp** -- this file outputs .jpg images depicting the transformations applied to a single 2D DICOM file throughout the image processing pipeline. This file is meant to provide a structured procedure of processing a medical image, before advancing to processing a set of DICOM images in an MRI scan session. When the its executable is run, visualization of the stages of processing are also shown.
+- **Source**: `src/test/test_pipeline.cpp`
+- Binary: `test_pipeline`
+- Function: This pipeline serves as a proof of concept and prototype for the image processing pipeline. It processes a single 2D DICOM slice through the defined pipeline stages. It provides a visualization of each the processed image in each of the intermediate steps, and exports the processed image after each stage to `out-test/`.
 
-### Sequential Image Processing
+### Sequential Image Processing (FAST)
 
-**Implemented in /src/test/main_sequential.cpp** -- this file processes an entire directory filled with 23 DICOM images corresponding to one full brain scan. Here, they are processed sequentially and each image goes through the processing pipeline -- where the original, and final processed image are saved to out-sequential/.
+- **Source**: `src/sequential/main_sequential.cpp`
+- Binary: `img_processing_sequential`
+- Function: Processes all patient T1+C (session after tumor has progressed) datasets found within the specified base data directory. It iterates through each patient folder, loads their DICOM series, and processes each sequentially. It saves the original 2D DICOM slice and the processed image pair to a patient-specific directory in `out-sequential/`.
 
-### Parallel Image Processing
+### Parallel Image Processing (FAST + OpenMP)
 
-**Implemented at /src/test/main_parallel.cpp** -- WIP
+- **Source**: `src/parallel/main_parallel.cpp`
+- Binary: `img-processing_parallel`
+- Function: Processes the same data as the above, however, the loaded DICOM images for each patient are processed in parallel batches. OpenMP is used to distribute the processing of images within a batch across multiple threads. The original/processed pair is saved to a patient-specific directory in `out-parallel/`.
 
 ## Dataset
 
 The dataset used for this project can be obtained from the [TCIA](https://www.cancerimagingarchive.net/collection/brain-tumor-progression/). In particular, the T1+C (T1-weighted post-contrast) subsets were used. T1+C images enhance the visualization of tumor boundaries because the contrast agent highlights areas with disrupted blood-brain barriers (common with malignant tumors), and simply provides a better contrast-to-noise ratio.
 
 ## Parallel Computer Used
+
 **IdeaPad 5 Pro 14ACN6**
+
 - AMD Ryzen 7 5800U (8C, 16T)
 - 16GB RAM DDR4-3200
 - NVIDIA® GeForce MX450 (2GB GDDR6)
- 
+
 ## License
 
 This project uses the FAST framework for medical image computing and visualization.
