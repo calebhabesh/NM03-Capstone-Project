@@ -9,7 +9,7 @@
 #include <FAST/Visualization/SegmentationRenderer/SegmentationRenderer.hpp>
 #include <FAST/Visualization/SimpleWindow.hpp>
 
-// Algorithm
+// Optimized Algorithms
 #include <FAST/Algorithms/BinaryThresholding/BinaryThresholding.hpp>
 #include <FAST/Algorithms/ImageCaster/ImageCaster.hpp>
 #include <FAST/Algorithms/ImageSharpening/ImageSharpening.hpp>
