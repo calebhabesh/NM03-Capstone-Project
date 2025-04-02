@@ -67,20 +67,20 @@ After building the target executables, and running their binaries the project ro
 ### Test Pipeline
 
 - **Source**: `src/test/test_pipeline.cpp`
-- Binary: `test_pipeline`
-- Function: This pipeline serves as a proof of concept and prototype for the image processing pipeline. It processes a single 2D DICOM slice through the defined pipeline stages. It provides a visualization of each the processed image in each of the intermediate steps, and exports the processed image after each stage to `out-test/`.
+- **Binary**: `test_pipeline`
+- **Function**: This pipeline serves as a proof of concept and prototype for the image processing pipeline. It processes a single 2D DICOM slice through the defined pipeline stages. It provides a visualization of each the processed image in each of the intermediate steps, and exports the processed image after each stage to `out-test/`.
 
 ### Sequential Image Processing (FAST)
 
 - **Source**: `src/sequential/main_sequential.cpp`
-- Binary: `img_processing_sequential`
-- Function: Processes all patient T1+C (session after tumor has progressed) datasets found within the specified base data directory. It iterates through each patient folder, loads their DICOM series, and processes each sequentially. It saves the original 2D DICOM slice and the processed image pair to a patient-specific directory in `out-sequential/`.
+- **Binary**: `img_processing_sequential`
+- **Function**: Processes all patient T1+C (session after tumor has progressed) datasets found within the specified base data directory. It iterates through each patient folder, loads their DICOM series, and processes each sequentially. It saves the original 2D DICOM slice and the processed image pair to a patient-specific directory in `out-sequential/`.
 
 ### Parallel Image Processing (FAST + OpenMP)
 
 - **Source**: `src/parallel/main_parallel.cpp`
-- Binary: `img-processing_parallel`
-- Function: Processes the same data as the above, however, the loaded DICOM images for each patient are processed in parallel batches. OpenMP is used to distribute the processing of images within a batch across multiple threads. The original/processed pair is saved to a patient-specific directory in `out-parallel/`.
+- **Binary**: `img-processing_parallel`
+- **Function**: Processes the same data as the above, however, the loaded DICOM images for each patient are processed in parallel batches. OpenMP is used to distribute the processing of images within a batch across multiple threads. The original/processed pair is saved to a patient-specific directory in `out-parallel/`.
 
 ## Dataset
 
