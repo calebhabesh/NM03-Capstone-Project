@@ -24,7 +24,7 @@ The pipeline involves several stages:
 
 - Parallel Computer
   - Computer with a multi-core processor, capable of running multiple threads of execution simultaneously
-- CMake (version 3.16 or higher)
+- CMake (version 3.5 or higher)
 - C++ compiler with C++17 support
 - FAST Framework (installed on system)
 - Git
