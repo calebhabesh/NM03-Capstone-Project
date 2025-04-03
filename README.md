@@ -2,7 +2,7 @@
 
 A parallel computing system to make brain imaging processing more efficient using [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization) and [OpenMP](https://www.openmp.org/wp-content/uploads/OpenMP-RefGuide-6.0-OMP60SC24-web.pdf). This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging processing tasks.
 
-This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a **further parallelized version (since FAST already provides some level of heterogeneous compute in their filtering/segmentation algorithms).** The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
+This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a **further parallelized version (since FAST already provides a baseline level of heterogeneous compute in their filtering/segmentation algorithms).** The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
 
 The pipeline involves several stages:
 
