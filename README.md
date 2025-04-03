@@ -1,8 +1,11 @@
-# Parallelizing Brain Image Processing using the FAST Framework and OpenMP
+# Optimizing Medical Image Processing: A Hybrid Approach with the FAST Framework and OpenMP
 
 A parallel computing system to make brain imaging processing more efficient using [FAST](https://github.com/smistad/FAST/) (Framework for Heterogeneous Medical Imaging Computing and Visualization) and [OpenMP](https://www.openmp.org/wp-content/uploads/OpenMP-RefGuide-6.0-OMP60SC24-web.pdf). This project focuses on broadly utilizing all applicable system resources available on the host system for computationally intensive medical imaging processing tasks.
 
-This requires first implementing a sequential implementation of an image processing pipeline, and then adapting a **further parallelized version (since FAST already provides a baseline level of heterogeneous compute in their filtering/segmentation algorithms).** The parallelized version is defined by the use of the OpenMP API which utilizes an implementation of multithreading making it more efficient, in this case, to process multiple DICOM images.
+In our project "sequential" and "parallel" refer to the two different modes in which the image processing ***workflow*** is performed:
+
+- **Sequential**: This implementation uses the FAST framework alone. The framework is already optimized and interally leverages OpenCL algorithms to speed up individual image processing operations (filtering, segmentation, etc.). In other words, while the low-level operations within FAST are optimized and may execute in parallel at a hardware level, the processing of multiple images is performed in a **serial** order.
+- **Parallel**: In this implementation, we extend the FAST-based serial workflow by adding an additional layer of parallelism using OpenMP. Here, the processing of a batch of images is distributed amongst multiple CPU threads. So, instead of waiting for the one image to complete processing, images can be processed concurrently--squeezing out extra performance alongside FAST's internal optimizations.
 
 The pipeline involves several stages:
 
