@@ -71,6 +71,7 @@ After building the target executables, and running their binaries the project ro
 - **Function**: This pipeline serves as a proof of concept and prototype for the image processing pipeline. It processes a single 2D DICOM slice through the defined pipeline stages. It provides a visualization of each the processed image in each of the intermediate steps, and exports the processed image after each stage to `out-test/`.
 
 ![Test Pipeline Execution Output](https://github.com/user-attachments/assets/0e3e6881-b01a-4e08-b62d-1c38c56c6b1b)
+
 ### Sequential Image Processing (FAST)
 
 - **Source**: `src/sequential/main_sequential.cpp`
@@ -89,7 +90,7 @@ The dataset used for this project can be obtained from the [TCIA](https://www.ca
 
 ## Parallel Computer Used
 
-**IdeaPad 5 Pro 14ACN6**
+**Lenovo IdeaPad 5 Pro 14ACN6**
 
 - AMD Ryzen 7 5800U (8C, 16T)
 - 16GB RAM DDR4-3200
