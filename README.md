@@ -7,8 +7,6 @@ In our project "sequential" and "parallel" refer to the two different modes in w
 - **Sequential**: This implementation uses the FAST framework alone. The framework is already optimized and interally leverages OpenCL algorithms to speed up individual image processing operations (filtering, segmentation, etc.). In other words, while the low-level operations within FAST are optimized and may execute in parallel at a hardware level, the processing of multiple images is performed in a **serial** order.
 - **Parallel**: In this implementation, we extend the FAST-based serial workflow by adding an additional layer of parallelism using OpenMP. Here, the processing of a batch of images is distributed amongst multiple CPU threads. So, instead of waiting for the one image to complete processing, images can be processed concurrently--squeezing out extra performance alongside FAST's internal optimizations.
 
-The pipeline involves several stages:
-
 1. **Import:** Loading DICOM files.
 2. **Preprocessing:** Applying Intensity Normalization, Intensity Clipping, Vector Median Filtering, and Image Sharpening.
 3. **Segmentation:** Using Seeded Region Growing with adaptive seed points based on image dimensions.
@@ -86,6 +84,14 @@ After building the target executables, and running their binaries the project ro
 - **Source**: `src/parallel/main_parallel.cpp`
 - **Binary**: `img-processing_parallel`
 - **Function**: Processes the same data as the above, however, the loaded DICOM images for each patient are processed in parallel batches. OpenMP is used to distribute the processing of images within a batch across multiple threads. The original/processed pair is saved to a patient-specific directory in `out-parallel/`.
+
+## Analysis
+
+For the purposes of this project, we needed to create and analyse data, some tools that were used include:
+
+- **Benchmarking**: [Hyperfine](https://github.com/sharkdp/hyperfine), [time](https://linux.die.net/man/1/time)
+- **Performance Analysis**: [Hotspot](https://github.com/KDAB/hotspot), [perf](https://perfwiki.github.io/main/)
+- **Data Analysis**: Python, Excel
 
 ## Dataset
 
