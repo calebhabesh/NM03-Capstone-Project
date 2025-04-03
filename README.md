@@ -7,6 +7,8 @@ In our project "sequential" and "parallel" refer to the two different modes in w
 - **Sequential**: This implementation uses the FAST framework alone. The framework is already optimized and interally leverages OpenCL algorithms to speed up individual image processing operations (filtering, segmentation, etc.). In other words, while the low-level operations within FAST are optimized and may execute in parallel at a hardware level, the processing of multiple images is performed in a **serial** order.
 - **Parallel**: In this implementation, we extend the FAST-based serial workflow by adding an additional layer of parallelism using OpenMP. Here, the processing of a batch of images is distributed amongst multiple CPU threads. So, instead of waiting for the one image to complete processing, images can be processed concurrently--squeezing out extra performance alongside FAST's internal optimizations.
 
+### Image Processing Stages
+
 1. **Import:** Loading DICOM files.
 2. **Preprocessing:** Applying Intensity Normalization, Intensity Clipping, Vector Median Filtering, and Image Sharpening.
 3. **Segmentation:** Using Seeded Region Growing with adaptive seed points based on image dimensions.
