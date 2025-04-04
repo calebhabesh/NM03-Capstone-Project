@@ -398,7 +398,8 @@ int main(int argc, char *argv[]) {
     Reporter::setGlobalReportMethod(Reporter::ERROR,
                                     Reporter::COUT); // Keep errors to console
 
-    omp_set_num_threads(16);
+    // Over Subscribing OS-Level Worker Threads
+    omp_set_num_threads(64);
 
     OptimizedParallelProcessor processor;
     processor.processAllPatients();
